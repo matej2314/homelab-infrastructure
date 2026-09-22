@@ -28,7 +28,7 @@ The homelab runs on a refurbished Dell mini PC.
 | --- | --- |
 | CPU | Intel Core i5-9500T |
 | RAM | 16 GB DDR4 |
-| Storage | 512 GB NVMe SSD |
+| Storage | 512 GB NVMe SSD (system); 4 TB SATA SSD (data storage) |
 | Form factor | Dell mini PC |
 | Type | Refurbished business-class machine |
 
@@ -155,7 +155,7 @@ Homelab działa na poleasingowym mini PC firmy Dell.
 | --- | --- |
 | CPU | Intel Core i5-9500T |
 | RAM | 16 GB DDR4 |
-| Dysk | 512 GB NVMe SSD |
+| Dysk | 512 GB NVMe SSD (system); 4 TB SATA SSD (przechowywanie danych) |
 | Format | Dell mini PC |
 | Typ | Poleasingowy komputer biznesowy |
 
