@@ -1,0 +1,18 @@
+services:
+  homarr:
+    container_name: lab-dashboard
+    image: ghcr.io/homarr-labs/homarr:latest
+    restart: unless-stopped
+    networks:
+      - main_network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./homarr/appdata:/appdata
+    environment:
+      - SECRET_ENCRYPTION_KEY=${DASHBOARD_SECRET_ENCRYPTION_KEY}
+    ports:
+      - "7575:7575"
+
+networks:
+  main_network:
+    external: true

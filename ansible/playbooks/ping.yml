@@ -1,0 +1,8 @@
+---
+- name: Verify SSH reachability to homelab lab
+  hosts: homelab
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Ping
+      ansible.builtin.ping:

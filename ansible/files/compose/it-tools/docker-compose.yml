@@ -1,0 +1,15 @@
+services:
+  it-tools:
+    container_name: it-tools
+    image: ghcr.io/sharevb/it-tools:nightly
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - 7072:8080
+    networks:
+      - main_network
+
+networks:
+  main_network:
+    external: true
+    name: main_network

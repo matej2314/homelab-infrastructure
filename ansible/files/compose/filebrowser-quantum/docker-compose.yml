@@ -1,0 +1,16 @@
+services:
+  filebrowser:
+    image: gtstef/filebrowser:latest
+    container_name: filebrowser
+    networks:
+      - main_network
+    ports:
+      - 7090:80
+    volumes:
+      - /mnt/HomelabData/storageDir:/pliki_homelab
+      - ./data:/home/filebrowser/data
+    restart: unless-stopped
+
+networks:
+  main_network:
+   external: true

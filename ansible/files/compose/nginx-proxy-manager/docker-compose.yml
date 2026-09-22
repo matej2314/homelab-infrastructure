@@ -1,0 +1,27 @@
+services:
+  app:
+    image: 'jc21/nginx-proxy-manager:2.15.1'
+    container_name: nginx_proxy
+    restart: unless-stopped
+    networks:
+      - main_network
+
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+      # Add any other Stream port you want to expose
+      # - '21:21' # FTP
+
+    environment:
+      TZ: "Europe/Warsaw"
+      DISABLE_IPV6: 'true'
+
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+
+networks:
+  main_network:
+    external: true
+    name: main_network

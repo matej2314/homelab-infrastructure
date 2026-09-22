@@ -1,0 +1,20 @@
+services:
+  trilium:
+    image: triliumnext/notes:latest
+    container_name: trilium
+    restart: unless-stopped
+    networks:
+      - main_network
+    environment:
+      - TRILIUM_DATA_DIR=/home/node/trilium-data
+    ports:
+      - "7080:8080"
+    volumes:
+      - ./data:/home/node/trilium-data
+      - /mnt/HomelabData/notesData:/home/node/trilium-data/backup
+
+
+networks:
+  main_network:
+    external: true
+

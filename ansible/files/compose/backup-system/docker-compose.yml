@@ -1,0 +1,29 @@
+services:
+  kopia:
+    image: kopia/kopia:latest
+    container_name: kopia
+    restart: unless-stopped
+    command:
+      - server
+      - start
+      - --ui
+      - --insecure
+      - --address=0.0.0.0:51515
+      - --server-username=${KOPIA_SERVER_USERNAME}
+      - --server-password=${KOPIA_SERVER_PASSWORD}
+    ports:
+      - "51515:51515"
+    networks:
+      - main_network
+    volumes:
+      - ./kopia-config:/app/config
+      - ./kopia-cache:/app/cache
+
+      - /mnt/HomelabData/homelab-backup:/repository
+      - /var/lib/docker/volumes:/data/docker_volumes:ro
+      - /home/ubuntu/appdata:/data/appdata:ro
+
+networks:
+  main_network:
+    external: true
+    name: main_network

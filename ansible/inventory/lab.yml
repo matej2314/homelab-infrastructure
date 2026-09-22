@@ -1,0 +1,11 @@
+all:
+  children:
+    homelab:
+      hosts:
+        homelab-lab:
+          ansible_host: __LAB_HOST__
+          ansible_user: __LAB_USER__
+          ansible_python_interpreter: auto_silent
+      vars:
+        homelab_env: lab
+        kwallet_folder: Homelab-lab

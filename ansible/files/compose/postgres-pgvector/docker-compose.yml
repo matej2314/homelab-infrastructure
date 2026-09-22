@@ -1,0 +1,38 @@
+services:
+    postgres:
+        image: pgvector/pgvector:pg18
+        container_name: postgres_vector_db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRESDB_USERNAME}
+            POSTGRES_PASSWORD: ${POSTGRESDB_PASSWORD}
+            POSTGRES_DB: ${POSTGRESDB_DATABASE}
+        networks:
+            - main_network
+        ports:
+            - '5432:5432'
+        volumes:
+            - pgdata:/var/lib/postgresql/
+
+    pgadmin:
+        image: dpage/pgadmin4:9.17
+        container_name: pgadmin
+        restart: unless-stopped
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+        networks:
+            - main_network
+        ports:
+            - '5433:80'
+        depends_on:
+            - postgres
+
+volumes:
+    pgdata:
+
+networks:
+    main_network:
+      external: true
+      name: main_network
+

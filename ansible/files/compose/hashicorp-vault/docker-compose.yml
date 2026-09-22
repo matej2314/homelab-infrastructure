@@ -1,0 +1,34 @@
+services:
+  vault:
+    build: .
+    container_name: vault-lab
+
+    command: server
+    restart: unless-stopped
+
+    user: "0:0"
+
+    environment:
+      VAULT_ADDR: "https://vault-lab:8200"
+      SKIP_SETCAP: "true"
+      VAULT_SKIP_VERIFY: "true"
+
+    networks:
+      - main_network
+    ports:
+      - "127.0.0.1:8200:8200"
+      - "127.0.0.1:8201:8201"
+
+    cap_add:
+      - IPC_LOCK
+
+    volumes:
+      - ./vault_data:/vault/data
+      - ./vault_logs:/vault/logs
+      - ./config/tls:/vault/tls:ro
+      - ./config/vault.hcl:/vault/config/vault.hcl:ro
+
+networks:
+  main_network:
+    external: true
+    name: main_network

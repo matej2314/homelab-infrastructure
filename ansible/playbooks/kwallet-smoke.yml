@@ -1,0 +1,30 @@
+---
+- name: KWallet smoke — write one secret to remote file or fail hard
+  hosts: homelab
+  gather_facts: false
+  vars:
+    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    remote_test_path: /tmp/homelab-kwallet-smoke
+  tasks:
+    - name: Fetch test secret from KWallet on control node
+      ansible.builtin.command:
+        argv:
+          - "{{ kwallet_script }}"
+          - "{{ kwallet_folder }}"
+          - ansible_lab_test
+      delegate_to: localhost
+      become: false
+      register: kwallet_test
+      changed_when: false
+      no_log: true
+
+    - name: Write secret to remote file with mode 0600
+      ansible.builtin.copy:
+        content: "{{ kwallet_test.stdout }}"
+        dest: "{{ remote_test_path }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Reminder — remove smoke file after check
+      ansible.builtin.debug:
+        msg: "Secret written to {{ remote_test_path }} (mode 0600). Remove after verifying."
