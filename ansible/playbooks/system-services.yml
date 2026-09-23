@@ -1,0 +1,81 @@
+---
+- name: Layer 2 - host monitoring and operator tools
+  hosts: homelab
+  become: true
+  vars:
+    prometheus_config_dest: /etc/prometheus/prometheus.yml
+    grafana_provisioning_datasources: /etc/grafana/provisioning/datasources/prometheus.yml
+  tasks:
+    - name: Install operator packages
+      ansible.builtin.apt:
+        name:
+          - btop
+        state: present
+        update_cache: true
+
+    - name: Check if lazydocker is installed
+      ansible.builtin.command: lazydocker --version
+      register: lazydocker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install lazydocker via official install script
+      ansible.builtin.shell: |
+       set -euo pipefail
+        curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+      args:
+        creates: /usr/local/bin/lazydocker
+      when: lazydocker_check.rc != 0
+
+    - name: Deploy prometheus configuration
+      ansible.builtin.copy:
+        src: "{{playbook_dir}}/../files/system/prometheus.yml"
+        dest: "{{prometheus_config_dest}}"
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart prometheus
+
+    - name: Ensure grafana provisioning datasources directory exists
+      ansible.builtin.file:
+        path: "{{grafana_provisioning_datasources}}"
+        state: directory
+        mode: '0755'
+  
+    - name: Deploy grafana prometheus datasource
+      ansible.builtin.copy:
+        src: "{{playbook_dir}}/../files/system/grafana-datasource.yml"
+        dest: "{{grafana_provisioning_datasources}}"
+        owner: root
+        group: grafana
+        mode: '0644'
+      notify: Restart grafana
+
+    - name: Enable and start node_exporter
+      ansible_builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+    
+    - name: Enable and start prometheus
+      ansible.builtin.service:
+        name: prometheus
+        state: started
+        enabled: true
+    
+    - name: Enable and start grafana
+      ansible.builtin.service:
+        name: grafana-server
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart prometheus
+      ansible.builtin.service:
+        name: prometheus
+        state: restarted
+
+    - name: Restart grafana
+      ansible.builtin.service:
+        name: grafana-server
+        state: restarted

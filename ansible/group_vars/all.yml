@@ -1,0 +1,22 @@
+---
+homelab_root: /opt/homelab
+docker_network_name: main_network
+
+homelab_stacks:
+  - nginx-proxy-manager
+  - hashicorp-vault
+  - mysql-phpmyadmin
+  - postgres-pgvector
+  - ollama
+  - jenkins
+  - cadvisor
+  - it-tools
+  - omni-tools
+  - filebrowser-quantum
+  - stirling-pdf
+  - trilium-notes
+  - dashboard
+  - redis
+  - backup-system
+
+ollama_embed_model: qwen3-embedding:0.6b
