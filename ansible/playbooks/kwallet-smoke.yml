@@ -2,6 +2,7 @@
 - name: KWallet smoke — write one secret to remote file or fail hard
   hosts: homelab
   gather_facts: false
+  become: false
   vars:
     kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
     remote_test_path: /tmp/homelab-kwallet-smoke
@@ -24,6 +25,7 @@
         dest: "{{ remote_test_path }}"
         mode: "0600"
       no_log: true
+      become: false
 
     - name: Reminder — remove smoke file after check
       ansible.builtin.debug:
