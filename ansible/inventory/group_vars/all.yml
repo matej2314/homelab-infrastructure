@@ -2,6 +2,13 @@
 homelab_root: /opt/homelab
 docker_network_name: main_network
 
+# Paths mirrored from prod compose bind-mounts; created only when homelab_env == lab
+lab_host_bind_paths:
+  - /mnt/HomelabData/storageDir
+  - /mnt/HomelabData/notesData
+  - /mnt/HomelabData/homelab-backup
+  - /home/ubuntu/appdata
+
 homelab_stacks:
   - nginx-proxy-manager
   - hashicorp-vault
@@ -18,5 +25,3 @@ homelab_stacks:
   - dashboard
   - redis
   - backup-system
-
-ollama_embed_model: qwen3-embedding:0.6b

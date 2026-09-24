@@ -1,0 +1,48 @@
+---
+- name: Layer 3f — tool stacks
+  hosts: homelab
+  become: true
+  vars:
+    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    tool_stacks:
+      - name: cadvisor
+        env_keys: []
+      - name: it-tools
+        env_keys: []
+      - name: omni-tools
+        env_keys: []
+      - name: stirling-pdf
+        env_keys: []
+      - name: trilium-notes
+        env_keys: []
+      - name: filebrowser-quantum
+        env_keys:
+          - { env: FILEBROWSER_ADMIN_PASSWORD, key: FILEBROWSER_ADMIN_PASSWORD }
+      - name: dashboard
+        env_keys:
+          - { env: DASHBOARD_SECRET_ENCRYPTION_KEY, key: DASHBOARD_SECRET_ENCRYPTION_KEY }
+      - name: backup-system
+        env_keys:
+          - { env: KOPIA_BACKUP_PASSWORD, key: KOPIA_BACKUP_PASSWORD }
+          - { env: KOPIA_SERVER_USERNAME, key: KOPIA_SERVER_USERNAME }
+          - { env: KOPIA_SERVER_PASSWORD, key: KOPIA_SERVER_PASSWORD }
+      - name: redis
+        env_keys:
+          - { env: REDIS_PASSWORD, key: REDIS_PASSWORD }
+  tasks:
+    - name: Prepare lab host paths for prod-like bind mounts
+      ansible.builtin.include_tasks: ../tasks/ensure-lab-host-paths.yml
+
+    - name: Deploy tool stack
+      ansible.builtin.include_tasks: ../tasks/deploy-stack-with-env.yml
+      loop: "{{ tool_stacks }}"
+      loop_control:
+        loop_var: stack
+      when: stack.env_keys | length > 0
+
+    - name: Deploy tool stack without .env
+      ansible.builtin.include_tasks: ../tasks/deploy-stack-plain.yml
+      loop: "{{ tool_stacks }}"
+      loop_control:
+        loop_var: stack
+      when: stack.env_keys | length == 0

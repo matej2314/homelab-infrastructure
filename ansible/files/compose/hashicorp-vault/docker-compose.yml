@@ -25,7 +25,6 @@ services:
     volumes:
       - ./vault_data:/vault/data
       - ./vault_logs:/vault/logs
-      - ./config/tls:/vault/tls:ro
       - ./config/vault.hcl:/vault/config/vault.hcl:ro
 
 networks:

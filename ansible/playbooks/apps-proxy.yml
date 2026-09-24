@@ -1,0 +1,26 @@
+---
+- name: Layer 3a — Nginx Proxy Manager
+  hosts: homelab
+  become: true
+  vars:
+    stack_name: nginx-proxy-manager
+    stack_src: "{{ playbook_dir }}/../files/compose/{{ stack_name }}"
+    stack_dest: "{{ homelab_root }}/{{ stack_name }}"
+  tasks:
+    - name: Ensure stack directory exists
+      ansible.builtin.file:
+        path: "{{ stack_dest }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync compose files to server
+      ansible.builtin.copy:
+        src: "{{ stack_src }}/"
+        dest: "{{ stack_dest }}/"
+        mode: "0644"
+
+    - name: Deploy Nginx Proxy Manager
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dest }}"
+        state: present
+        pull: policy

@@ -1,0 +1,33 @@
+---
+- name: Layer 3b — HashiCorp Vault (container only; no blind unseal)
+  hosts: homelab
+  become: true
+  vars:
+    stack_name: hashicorp-vault
+    stack_src: "{{ playbook_dir }}/../files/compose/{{ stack_name }}"
+    stack_dest: "{{ homelab_root }}/{{ stack_name }}"
+  tasks:
+    - name: Ensure stack directory exists
+      ansible.builtin.file:
+        path: "{{ stack_dest }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync compose files to server
+      ansible.builtin.copy:
+        src: "{{ stack_src }}/"
+        dest: "{{ stack_dest }}/"
+        mode: "0644"
+
+    - name: Deploy Vault container
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dest }}"
+        state: present
+        build: always
+        pull: policy
+
+    - name: Reminder — init/unseal is manual / documented, not every-run
+      ansible.builtin.debug:
+        msg: >-
+          Do not re-init on rerun. Store root token / unseal keys in KWallet
+          (vault_root_token). Ansible does not unseal blindly in v1.

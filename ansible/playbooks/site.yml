@@ -1,0 +1,24 @@
+---
+- name: Homelab site — layers in dependency order
+  ansible.builtin.import_playbook: bootstrap.yml
+
+- name: Homelab site — system services
+  ansible.builtin.import_playbook: system-services.yml
+
+- name: Homelab site — proxy
+  ansible.builtin.import_playbook: apps-proxy.yml
+
+- name: Homelab site — vault
+  ansible.builtin.import_playbook: apps-vault.yml
+
+- name: Homelab site — data
+  ansible.builtin.import_playbook: apps-data.yml
+
+- name: Homelab site — ai
+  ansible.builtin.import_playbook: apps-ai.yml
+
+- name: Homelab site — cicd
+  ansible.builtin.import_playbook: apps-cicd.yml
+
+- name: Homelab site — tools
+  ansible.builtin.import_playbook: apps-tools.yml

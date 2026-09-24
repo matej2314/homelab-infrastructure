@@ -1,0 +1,63 @@
+---
+- name: Layer 3d — Ollama + embedding model
+  hosts: homelab
+  become: true
+  vars:
+    stack_name: ollama
+    stack_src: "{{ playbook_dir }}/../files/compose/{{ stack_name }}"
+    stack_dest: "{{ homelab_root }}/{{ stack_name }}"
+    ollama_main_container: ollama-embedding
+    ollama_pull_container: ollama-pull
+  tasks:
+    - name: Ensure stack directory exists
+      ansible.builtin.file:
+        path: "{{ stack_dest }}"
+        state: directory
+        mode: "0755"
+
+    - name: Sync compose files to server
+      ansible.builtin.copy:
+        src: "{{ stack_src }}/"
+        dest: "{{ stack_dest }}/"
+        mode: "0644"
+
+    - name: Resolve embedding model from compose (single source of truth)
+      ansible.builtin.set_fact:
+        ollama_embed_model: >-
+          {{
+            (lookup('file', stack_src ~ '/docker-compose.yml') | from_yaml)
+            .services['ollama-pull'].command[1]
+          }}
+
+    - name: Deploy Ollama (pull of embedding model is owned by compose ollama-pull)
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dest }}"
+        state: present
+        pull: policy
+
+    - name: Wait until embedding model is present in main Ollama container
+      community.docker.docker_container_exec:
+        container: "{{ ollama_main_container }}"
+        command: ollama list
+      register: ollama_list
+      until: ollama_embed_model in (ollama_list.stdout | default(""))
+      retries: 90
+      delay: 10
+      changed_when: false
+
+    - name: Check whether ollama-pull container is still present
+      community.docker.docker_container_info:
+        name: "{{ ollama_pull_container }}"
+      register: ollama_pull_info
+      failed_when: false
+
+    - name: Stop and remove leftover ollama-pull after successful model load
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker stop "{{ ollama_pull_container }}"
+        docker rm "{{ ollama_pull_container }}"
+      args:
+        executable: /bin/bash
+      when:
+        - ollama_embed_model in (ollama_list.stdout | default(""))
+        - ollama_pull_info.exists | default(false)

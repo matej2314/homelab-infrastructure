@@ -1,0 +1,12 @@
+---
+# Lab VM only: create the same host paths as prod compose bind-mounts.
+# Plain directories on one disk — not a second volume / fstab mount.
+# Prod (homelab_env != lab): no-op; real /mnt/HomelabData already exists.
+
+- name: Ensure lab host bind-mount paths exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ lab_host_bind_paths }}"
+  when: homelab_env == 'lab'

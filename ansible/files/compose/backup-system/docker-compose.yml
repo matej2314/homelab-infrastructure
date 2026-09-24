@@ -3,12 +3,16 @@ services:
     image: kopia/kopia:latest
     container_name: kopia
     restart: unless-stopped
+    environment:
+      - KOPIA_PASSWORD=${KOPIA_BACKUP_PASSWORD}
     command:
       - server
       - start
       - --ui
-      - --insecure
       - --address=0.0.0.0:51515
+      - --tls-generate-cert
+      - --tls-cert-file=/app/config/cert.pem
+      - --tls-key-file=/app/config/key.pem
       - --server-username=${KOPIA_SERVER_USERNAME}
       - --server-password=${KOPIA_SERVER_PASSWORD}
     ports:
@@ -16,14 +20,16 @@ services:
     networks:
       - main_network
     volumes:
+      # Kopia configuration
       - ./kopia-config:/app/config
       - ./kopia-cache:/app/cache
 
+      # destination of backup
       - /mnt/HomelabData/homelab-backup:/repository
+      # backup sources
       - /var/lib/docker/volumes:/data/docker_volumes:ro
       - /home/ubuntu/appdata:/data/appdata:ro
 
 networks:
   main_network:
     external: true
-    name: main_network

@@ -6,6 +6,8 @@ services:
       - main_network
     ports:
       - 7090:80
+    environment:
+      - FILEBROWSER_ADMIN_PASSWORD=${FILEBROWSER_ADMIN_PASSWORD}
     volumes:
       - /mnt/HomelabData/storageDir:/pliki_homelab
       - ./data:/home/filebrowser/data

@@ -1,0 +1,26 @@
+---
+- name: Layer 3c — databases (MySQL+phpMyAdmin, Postgres+pgvector+pgAdmin)
+  hosts: homelab
+  become: true
+  vars:
+    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    db_stacks:
+      - name: mysql-phpmyadmin
+        env_keys:
+          # compose: MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+          - { env: MYSQL_ROOT_PASSWORD, key: MYSQL_ROOT_PASSWORD }
+      - name: postgres-pgvector
+        env_keys:
+          # compose postgres: POSTGRES_USER / PASSWORD / DB ← te nazwy w .env
+          - { env: POSTGRESDB_USERNAME, key: POSTGRESDB_USERNAME }
+          - { env: POSTGRESDB_PASSWORD, key: POSTGRESDB_PASSWORD }
+          - { env: POSTGRESDB_DATABASE, key: POSTGRESDB_DATABASE }
+          # compose pgadmin
+          - { env: PGADMIN_DEFAULT_EMAIL, key: PGADMIN_DEFAULT_EMAIL }
+          - { env: PGADMIN_DEFAULT_PASSWORD, key: PGADMIN_DEFAULT_PASSWORD }
+  tasks:
+    - name: Deploy each database stack
+      ansible.builtin.include_tasks: ../tasks/deploy-stack-with-env.yml
+      loop: "{{ db_stacks }}"
+      loop_control:
+        loop_var: stack

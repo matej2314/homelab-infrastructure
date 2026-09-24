@@ -3,8 +3,15 @@
   hosts: homelab
   become: true
   vars:
+    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    prometheus_listen_port: 6705
     prometheus_config_dest: /etc/prometheus/prometheus.yml
+    prometheus_default_dest: /etc/default/prometheus
     grafana_provisioning_datasources: /etc/grafana/provisioning/datasources/prometheus.yml
+    grafana_provisioning_dashboards: /etc/grafana/provisioning/dashboards/homelab.yml
+    grafana_dashboards_dir: /var/lib/grafana/dashboards
+    grafana_systemd_dropin_dir: /etc/systemd/system/grafana-server.service.d
+    grafana_systemd_dropin: /etc/systemd/system/grafana-server.service.d/override.conf
   tasks:
     - name: Install operator packages
       ansible.builtin.apt:
@@ -21,48 +28,200 @@
 
     - name: Install lazydocker via official install script
       ansible.builtin.shell: |
-       set -euo pipefail
+        set -euo pipefail
         curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
       args:
         creates: /usr/local/bin/lazydocker
       when: lazydocker_check.rc != 0
 
-    - name: Deploy prometheus configuration
+    - name: Install Prometheus and node_exporter (Ubuntu packages)
+      ansible.builtin.apt:
+        name:
+          - prometheus
+          - prometheus-node-exporter
+        state: present
+        update_cache: true
+
+    - name: Check whether grafana package is already installed
+      ansible.builtin.command:
+        argv:
+          - dpkg-query
+          - -W
+          - -f=${Status}
+          - grafana
+      register: grafana_pkg_status
+      changed_when: false
+      failed_when: false
+
+    - name: Mask grafana-server before first install (block auto-start without admin env)
+      ansible.builtin.systemd:
+        name: grafana-server
+        masked: true
+      when: grafana_pkg_status.rc != 0
+
+    - name: Install Grafana APT prerequisites
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - wget
+          - gnupg
+        state: present
+
+    - name: Ensure apt keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Add Grafana Labs GPG key
+      ansible.builtin.get_url:
+        url: https://apt.grafana.com/gpg-full.key
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: "0644"
+
+    - name: Add Grafana Labs APT repository (stable)
+      ansible.builtin.apt_repository:
+        repo: deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main
+        filename: grafana
+        state: present
+
+    - name: Install Grafana OSS from Grafana Labs APT
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+        update_cache: true
+
+    - name: Configure Prometheus listen address ({{ prometheus_listen_port }})
       ansible.builtin.copy:
-        src: "{{playbook_dir}}/../files/system/prometheus.yml"
-        dest: "{{prometheus_config_dest}}"
+        content: |
+          # Managed by Ansible — Prometheus listen address (homelab)
+          # Debian/Ubuntu package reads ARGS for the prometheus unit.
+          ARGS="--web.listen-address=0.0.0.0:{{ prometheus_listen_port }}"
+        dest: "{{ prometheus_default_dest }}"
         owner: root
         group: root
-        mode: '0644'
+        mode: "0644"
       notify: Restart prometheus
+
+    - name: Deploy prometheus configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/system/prometheus.yml"
+        dest: "{{ prometheus_config_dest }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart prometheus
+
+    - name: Fetch Grafana admin user from KWallet
+      ansible.builtin.command:
+        argv:
+          - "{{ kwallet_script }}"
+          - "{{ kwallet_folder }}"
+          - GRAFANA_ADMIN_USER
+      delegate_to: localhost
+      become: false
+      register: grafana_admin_user
+      changed_when: false
+      no_log: true
+
+    - name: Fetch Grafana admin password from KWallet
+      ansible.builtin.command:
+        argv:
+          - "{{ kwallet_script }}"
+          - "{{ kwallet_folder }}"
+          - GRAFANA_ADMIN_PASSWORD
+      delegate_to: localhost
+      become: false
+      register: grafana_admin_password
+      changed_when: false
+      no_log: true
+
+    - name: Ensure grafana systemd drop-in directory exists
+      ansible.builtin.file:
+        path: "{{ grafana_systemd_dropin_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy grafana admin credentials via systemd drop-in
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible — do not edit; secrets from KWallet
+          [Service]
+          Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout }}
+          Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout }}
+        dest: "{{ grafana_systemd_dropin }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      register: grafana_dropin
+      notify: Restart grafana
+
+    - name: Unmask grafana-server and reload systemd (drop-in ready)
+      ansible.builtin.systemd:
+        name: grafana-server
+        masked: false
+        daemon_reload: true
 
     - name: Ensure grafana provisioning datasources directory exists
       ansible.builtin.file:
-        path: "{{grafana_provisioning_datasources}}"
+        path: "{{ grafana_provisioning_datasources | dirname }}"
         state: directory
-        mode: '0755'
-  
+        mode: "0755"
+
     - name: Deploy grafana prometheus datasource
       ansible.builtin.copy:
-        src: "{{playbook_dir}}/../files/system/grafana-datasource.yml"
-        dest: "{{grafana_provisioning_datasources}}"
+        src: "{{ playbook_dir }}/../files/system/grafana-datasource.yml"
+        dest: "{{ grafana_provisioning_datasources }}"
         owner: root
         group: grafana
-        mode: '0644'
+        mode: "0644"
+      notify: Restart grafana
+
+    - name: Ensure grafana dashboards directory exists
+      ansible.builtin.file:
+        path: "{{ grafana_dashboards_dir }}"
+        state: directory
+        owner: grafana
+        group: grafana
+        mode: "0755"
+
+    - name: Ensure grafana provisioning dashboards directory exists
+      ansible.builtin.file:
+        path: "{{ grafana_provisioning_dashboards | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy grafana dashboards provider
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/system/grafana-dashboards.yml"
+        dest: "{{ grafana_provisioning_dashboards }}"
+        owner: root
+        group: grafana
+        mode: "0644"
+      notify: Restart grafana
+
+    - name: Sync grafana dashboard JSON files
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/system/dashboards/"
+        dest: "{{ grafana_dashboards_dir }}/"
+        owner: grafana
+        group: grafana
+        mode: "0644"
       notify: Restart grafana
 
     - name: Enable and start node_exporter
-      ansible_builtin.service:
+      ansible.builtin.service:
         name: prometheus-node-exporter
         state: started
         enabled: true
-    
+
     - name: Enable and start prometheus
       ansible.builtin.service:
         name: prometheus
         state: started
         enabled: true
-    
+
     - name: Enable and start grafana
       ansible.builtin.service:
         name: grafana-server

@@ -1,0 +1,18 @@
+---
+- name: "Ensure directory for {{ stack.name }}"
+  ansible.builtin.file:
+    path: "{{ homelab_root }}/{{ stack.name }}"
+    state: directory
+    mode: "0755"
+
+- name: "Sync compose for {{ stack.name }}"
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../files/compose/{{ stack.name }}/"
+    dest: "{{ homelab_root }}/{{ stack.name }}/"
+    mode: "0644"
+
+- name: "Compose up {{ stack.name }}"
+  community.docker.docker_compose_v2:
+    project_src: "{{ homelab_root }}/{{ stack.name }}"
+    state: present
+    pull: policy

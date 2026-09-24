@@ -1,0 +1,42 @@
+---
+- name: Layer 3e — Jenkins (build from local Dockerfile)
+  hosts: homelab
+  become: true
+  vars:
+    stack_name: jenkins
+    stack_src: "{{ playbook_dir }}/../files/compose/{{ stack_name }}"
+    stack_dest: "{{ homelab_root }}/{{ stack_name }}"
+  tasks:
+    - name: Ensure stack directory exists
+      ansible.builtin.file:
+        path: "{{ stack_dest }}"
+        state: directory
+        mode: "0755"
+
+    - name: Resolve docker group GID on host
+      ansible.builtin.getent:
+        database: group
+        key: docker
+
+    - name: Set docker_gid from host group
+      ansible.builtin.set_fact:
+        docker_gid: "{{ ansible_facts.getent_group.docker[1] }}"
+
+    - name: Sync Dockerfile to server
+      ansible.builtin.copy:
+        src: "{{ stack_src }}/Dockerfile"
+        dest: "{{ stack_dest }}/Dockerfile"
+        mode: "0644"
+
+    - name: Render Jenkins compose with host docker GID
+      ansible.builtin.template:
+        src: "{{ stack_src }}/docker-compose.yml.j2"
+        dest: "{{ stack_dest }}/docker-compose.yml"
+        mode: "0644"
+
+    - name: Build and deploy Jenkins via Compose v2
+      community.docker.docker_compose_v2:
+        project_src: "{{ stack_dest }}"
+        state: present
+        build: always
+        pull: policy
