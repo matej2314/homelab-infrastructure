@@ -6,7 +6,7 @@
 
 This repository documents a personal homelab built as a small, practical infrastructure environment for learning, experimentation and separating self-hosted services from the main development workstation.
 
-The project is intentionally described as a case study rather than a ready-to-run infrastructure template. Its main purpose is to document the hardware choice, technical assumptions, early decisions, current state, trade-offs and planned improvements behind the setup.
+It is a case study: hardware choices, assumptions, trade-offs and planned work live in this README. The same repo also holds **Ansible playbooks and Compose stacks** under `ansible/` so the server can be brought up repeatably on a lab VM (default) or, deliberately, on production.
 
 ### Motivation
 
@@ -17,6 +17,7 @@ The homelab was created to support several goals:
 - Reduce the workload and background services running on the development machine.
 - Create local storage for projects and related resources.
 - Learn Linux server setup and hardening from the ground up.
+- Practice Infrastructure as Code (Ansible + Compose) without treating the production Dell as a test target.
 
 Instead of treating infrastructure as something abstract or cloud-only, this setup provides a controlled local environment where services can be installed, configured, monitored and improved incrementally.
 
@@ -28,7 +29,7 @@ The homelab runs on a refurbished Dell mini PC.
 | --- | --- |
 | CPU | Intel Core i5-9500T |
 | RAM | 16 GB DDR4 |
-| Storage | 512 GB NVMe SSD (system); 4 TB SATA SSD (data storage) |
+| Storage | 512 GB NVMe SSD (system); 4 TB SATA SSD (data storage, mounted at `/mnt/HomelabData`) |
 | Form factor | Dell mini PC |
 | Type | Refurbished business-class machine |
 
@@ -38,92 +39,101 @@ The hardware was selected because it offered a good balance between price, perfo
 
 The server runs Ubuntu Server 26.04.
 
-The system was installed and configured from scratch, which made the setup process part of the learning experience. At this stage, not every part of the server is fully hardened or automated yet, but the foundation is in place and can be improved over time.
+The system was installed and configured from scratch, which made the setup process part of the learning experience. At this stage, not every part of the server is fully hardened, but the foundation is in place and can be improved over time. Day-to-day deployment of stacks is driven from Ansible on a Kubuntu control node.
 
 ### Current Scope
 
-The current scope focuses on a small local infrastructure environment:
+Single-node LAN-only server. What exists in this repository today:
 
-- Docker for running containerized services.
-- Prometheus for metrics collection.
-- Grafana for visualization and dashboards.
-- Local storage shared between containers and selected system services.
-- Wake-on-LAN support for powering on the machine remotely inside the local network.
+**Host / system (Ansible `bootstrap.yml`, `system-services.yml`)**
 
-The setup may be extended with additional services in the future, depending on actual needs.
+- Docker Engine, Compose plugin, external Docker network `main_network`
+- Prometheus (listen port `6705`) and node_exporter
+- Grafana from the [official Grafana Labs APT repo](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin credentials from KWallet, Prometheus datasource + provisioned dashboard JSON
+- Operator tools: `btop`, `lazydocker`
+
+**Compose stacks under `ansible/files/compose/` (wired into playbooks / `site.yml`)**
+
+| Area | Playbook | Stacks |
+| --- | --- | --- |
+| Proxy | `apps-proxy.yml` | Nginx Proxy Manager (`80`/`443`/`81`) — proxy hosts and DuckDNS/TLS are configured in the NPM UI, not by Ansible |
+| Secrets app | `apps-vault.yml` | HashiCorp Vault (container; init/unseal is manual) |
+| Data | `apps-data.yml` | MySQL + phpMyAdmin; Postgres (pgvector) + pgAdmin |
+| AI | `apps-ai.yml` | Ollama + embedding model pull |
+| CI | `apps-cicd.yml` | Jenkins (local Dockerfile; Docker socket GID from the host) |
+| Tools | `apps-tools.yml` | cAdvisor (`6700`), it-tools, omni-tools, Stirling PDF (`7070`), Trilium Notes (`7080`), FileBrowser Quantum, Homarr (`7575`), Redis Stack (`6379`), Kopia backup UI (`51515`) |
+
+Secrets used by Compose and Grafana are read from **KDE Wallet** on the control node (see `ansible/files/compose/kwallet-keys.md`). Values are never committed; Ansible may write short-lived `.env` files on the server with mode `0600`.
+
+Also in scope operationally (not fully automated here): Wake-on-LAN; local storage under `/mnt/HomelabData` on the Dell.
 
 ### Architecture Assumptions
 
-The homelab is currently designed as a single-node local server.
+The homelab is a single-node local server. Services stay on the LAN; public exposure is not part of the current design. VPN for remote access is planned later.
 
-The main architectural assumption is to keep services inside the local network and use the server as a dedicated place for infrastructure-related workloads. Storage is intended to serve both containerized applications and selected system-level services.
-
-At this stage, the server is not exposed to the public internet. Services are available only inside the local LAN. A VPN access path is planned for the future to provide controlled remote connectivity without exposing services directly.
+Compose files are treated as **production-shaped** copies (paths such as `/mnt/HomelabData/...`). On the **lab** inventory, Ansible creates those paths as ordinary directories on one disk (`ensure-lab-host-paths.yml`) so bind mounts work without a second physical drive. On **prod**, those paths are assumed to already exist (real data disk mount).
 
 ### Key Decisions
 
-The initial implementation is based on a few practical decisions:
-
-- Use Docker as the primary way to run application services.
-- Keep the server local-only instead of exposing it to the internet.
-- Enable Wake-on-LAN to make the machine easier to manage.
-- Start with a simple single-host architecture before adding more complexity.
-- Treat monitoring as an early part of the setup through Prometheus and Grafana.
-
-These choices keep the environment understandable and manageable while still leaving room for future improvements.
+- Docker + one external network `main_network` for application stacks.
+- Ansible layered playbooks; default inventory is lab, never prod by accident.
+- Secrets from KWallet on Kubuntu; HashiCorp Vault is an app on the server, not the Ansible secret backend.
+- Monitoring early (Prometheus, Grafana, cAdvisor).
+- NPM as the intended HTTP(S) front; certificate and proxy rules stay manual in the UI.
 
 ### Trade-Offs
 
-The current setup accepts several trade-offs:
-
-- The server is a single point of failure.
-- The budget is intentionally limited.
-- There is no high availability layer.
-- Backup strategy has not been fully designed yet.
-- Some hardening and automation work is still planned rather than completed.
-
-For the current purpose of learning and local experimentation, these trade-offs are acceptable. They also make the project easier to evolve step by step.
+- Single point of failure; no HA; limited budget.
+- Backup **policy** (schedules, restore tests, retention) is not finished — only the Kopia stack is automated.
+- Full green-field validation of `site.yml` on a clean lab VM is ongoing learning work, not a claimed production guarantee.
+- Some hardening and VPN work remain future goals.
 
 ### Security Model
 
-The current security approach is conservative:
-
-- Services are available only inside the local LAN.
-- The server is not exposed directly to the public internet.
-- SSH password authentication is disabled; key-based authentication is required.
-- Remote access through VPN is planned as a future improvement.
-- Linux hardening is one of the learning goals of the project.
-
-The security model is expected to evolve as the homelab becomes more mature.
+- LAN-only services; no intentional public exposure of the server.
+- SSH key authentication (password login disabled on the server).
+- No secret values in git; KWallet folders `Homelab-lab` / `Homelab-prod`.
+- VPN and further hardening are planned improvements.
 
 ### Backup Status
 
-At the moment, a complete backup strategy has not been designed yet.
+A complete backup strategy has not been designed yet.
 
-This is an intentional area for future work. A production-like homelab should eventually include regular backups, restore testing and a clear distinction between configuration backups, application data backups and project storage backups.
+The [Kopia](https://kopia.io/) stack is in `ansible/files/compose/backup-system/`, deployed by `apps-tools.yml` (and `site.yml`). UI on port `51515`; repository path `/mnt/HomelabData/homelab-backup`; secrets via KWallet (`KOPIA_*` keys in `kwallet-keys.md`). On lab, Ansible creates the path directories; on prod they come from the real data disk. Deploying the container is not the same as a finished backup policy.
 
 ### Lessons Learned
 
-One of the most surprising parts of the process was how straightforward the initial setup was. Even though the hardware is not new, the installation and first configuration steps went smoothly.
-
-The project has already provided practical experience with installing and configuring Ubuntu Server from scratch. Some areas still require additional work, but the base system is operational and ready for further iteration.
+Initial OS and hardware setup was smoother than expected. The project already provided practice with Ubuntu Server from scratch; Ansible is now the main way to make the stack repeatable for learning on a VM before touching production.
 
 ### Planned Improvements
 
-Future improvements may include:
-
-- Designing and implementing a proper backup strategy.
-- Adding VPN-based remote access.
-- Extending Linux hardening.
-- Expanding monitoring dashboards.
-- Adding more self-hosted services when there is a clear need.
-- Documenting architecture changes as the setup evolves.
+- Backup policy (schedules, restore tests, retention).
+- VPN-based remote access.
+- Further Linux hardening.
+- NPM/DuckDNS host wiring as a documented manual runbook (or later automation).
+- More services only when there is a clear need.
+- Keep README and `ansible/` aligned as the setup evolves.
 
 ### Repository Scope
 
-This repository currently focuses on documentation. It does not aim to provide a complete infrastructure-as-code setup, deployment automation or production-ready configuration files.
+This repository contains:
 
-The main artifact is this README, which describes the reasoning and current state of the homelab.
+1. **This README** — case study, assumptions, trade-offs.
+2. **`ansible/`** — inventories (lab/prod), layered playbooks, shared tasks, Compose/Dockerfile assets, KWallet key map, Grafana/Prometheus configs.
+
+It is a personal learning IaC setup for this homelab, not a generic public template or a claim of production-hardened automation.
+
+### Ansible (lab vs prod)
+
+Always work from the `ansible/` directory. Install collections first: `ansible-galaxy collection install -r requirements.yml`.
+
+- Lab (default in `ansible.cfg`): `ansible-playbook playbooks/<playbook>.yml`
+- Prod (intentional only): `ansible-playbook -i inventory/prod.yml playbooks/<playbook>.yml`
+- Prefer one layer at a time; full stack: `ansible-playbook playbooks/site.yml` only after each layer works alone
+- Layers: `ping` → `kwallet-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
+- Required KWallet key names: `ansible/files/compose/kwallet-keys.md`
+
+The production Dell is not a test target. Fill inventory placeholders (`__LAB_HOST__`, and so on) locally before running playbooks.
 
 ---
 
@@ -131,123 +141,123 @@ The main artifact is this README, which describes the reasoning and current stat
 
 ### Opis
 
-To repozytorium dokumentuje osobisty homelab zbudowany jako małe, praktyczne środowisko infrastrukturalne do nauki, eksperymentowania i oddzielenia usług self-hosted od głównej stacji roboczej używanej do pracy deweloperskiej.
+To repozytorium dokumentuje osobisty homelab — małe środowisko do nauki, eksperymentów i oddzielenia usług self-hosted od stacji deweloperskiej.
 
-Projekt jest celowo opisany jako case study, a nie jako gotowy szablon infrastruktury do uruchomienia. Jego głównym celem jest udokumentowanie wyboru sprzętu, założeń technicznych, pierwszych decyzji, obecnego stanu, kompromisów oraz planowanych usprawnień.
+Jest to case study (sprzęt, założenia, kompromisy, plany) w tym README oraz **automatyzacja Ansible + Compose** w katalogu `ansible/`, żeby powtarzalnie stawiać usługi na VM-lab (domyślnie) albo świadomie na produkcji.
 
 ### Motywacja
 
-Homelab powstał z kilku powodów:
-
-- Nauka praktyk związanych z DevOps i infrastrukturą.
-- Przeniesienie aplikacji dockerowych poza główną stację roboczą.
-- Odciążenie komputera używanego do codziennej pracy deweloperskiej.
-- Stworzenie lokalnego storage'u dla projektów i powiązanych zasobów.
-- Nauka konfiguracji i hardeningu serwera Linux od podstaw.
-
-Zamiast traktować infrastrukturę jako coś abstrakcyjnego albo dostępnego wyłącznie w chmurze, ten homelab daje kontrolowane lokalne środowisko, w którym można instalować, konfigurować, monitorować i rozwijać usługi krok po kroku.
+- Nauka DevOps i infrastruktury w realnym środowisku.
+- Przeniesienie aplikacji dockerowych poza główną stację.
+- Odciążenie komputera do codziennej pracy.
+- Lokalny storage na projekty.
+- Nauka Linuxa i hardeningu od podstaw.
+- Ćwiczenie IaC (Ansible + Compose) bez używania produkcyjnego Della jako poligonu.
 
 ### Sprzęt
 
-Homelab działa na poleasingowym mini PC firmy Dell.
+Homelab działa na poleasingowym mini PC Dell.
 
 | Komponent | Specyfikacja |
 | --- | --- |
 | CPU | Intel Core i5-9500T |
 | RAM | 16 GB DDR4 |
-| Dysk | 512 GB NVMe SSD (system); 4 TB SATA SSD (przechowywanie danych) |
+| Dysk | 512 GB NVMe SSD (system); 4 TB SATA SSD (dane, montowane jako `/mnt/HomelabData`) |
 | Format | Dell mini PC |
 | Typ | Poleasingowy komputer biznesowy |
 
-Sprzęt został wybrany ze względu na dobry stosunek ceny do wydajności oraz energooszczędność. Mały komputer poleasingowy okazał się wystarczający dla początkowego zakresu projektu, przy zachowaniu rozsądnego kosztu i niewielkiego poboru energii.
-
 ### System Operacyjny
 
-Serwer działa na Ubuntu Server 26.04.
-
-System został zainstalowany i skonfigurowany od zera, dzięki czemu sam proces konfiguracji stał się częścią nauki. Na tym etapie nie każdy element serwera jest jeszcze w pełni utwardzony lub zautomatyzowany, ale podstawy są gotowe i mogą być rozwijane iteracyjnie.
+Ubuntu Server 26.04, instalacja od zera. Deployment stacków na co dzień idzie z laptopa (Kubuntu) przez Ansible.
 
 ### Obecny Zakres
 
-Obecny zakres skupia się na małym lokalnym środowisku infrastrukturalnym:
+Serwer single-node, tylko LAN. To, co jest w repo:
 
-- Docker do uruchamiania usług kontenerowych.
-- Prometheus do zbierania metryk.
-- Grafana do wizualizacji i dashboardów.
-- Lokalny storage współdzielony przez kontenery i wybrane usługi systemowe.
-- Wake-on-LAN do zdalnego uruchamiania maszyny w ramach sieci lokalnej.
+**Host / system (`bootstrap.yml`, `system-services.yml`)**
 
-Konfiguracja może zostać rozbudowana o kolejne usługi w przyszłości, zależnie od faktycznych potrzeb.
+- Docker Engine, Compose, sieć `main_network`
+- Prometheus (port `6705`), node_exporter
+- Grafana z [oficjalnego APT Grafana Labs](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin z KWallet, datasource Prometheus + dashboard z JSON
+- `btop`, `lazydocker`
+
+**Stacki Compose (`ansible/files/compose/` → playbooki / `site.yml`)**
+
+| Obszar | Playbook | Stacki |
+| --- | --- | --- |
+| Proxy | `apps-proxy.yml` | Nginx Proxy Manager (`80`/`443`/`81`) — hosty i DuckDNS/TLS w GUI NPM, nie w Ansible |
+| Sejf aplikacji | `apps-vault.yml` | HashiCorp Vault (kontener; init/unseal ręcznie) |
+| Dane | `apps-data.yml` | MySQL + phpMyAdmin; Postgres (pgvector) + pgAdmin |
+| AI | `apps-ai.yml` | Ollama + model embeddingowy |
+| CI | `apps-cicd.yml` | Jenkins (lokalny Dockerfile; GID Dockera z hosta) |
+| Narzędzia | `apps-tools.yml` | cAdvisor (`6700`), it-tools, omni-tools, Stirling PDF (`7070`), Trilium (`7080`), FileBrowser, Homarr (`7575`), Redis Stack (`6379`), Kopia (`51515`) |
+
+Sekrety: **KDE Wallet** na control node (`ansible/files/compose/kwallet-keys.md`), bez wartości w gicie. Ansible może zapisać `.env` na serwerze z uprawnieniami `0600`.
+
+Poza pełną automatyzacją w repo: Wake-on-LAN; storage pod `/mnt/HomelabData` na Dellu.
 
 ### Założenia Architektury
 
-Homelab jest obecnie projektowany jako pojedynczy lokalny serwer.
+Jeden serwer w LAN, bez wystawiania do internetu; VPN później.
 
-Główne założenie architektoniczne polega na utrzymaniu usług wewnątrz sieci lokalnej i wykorzystaniu serwera jako dedykowanego miejsca dla zadań infrastrukturalnych. Storage ma obsługiwać zarówno aplikacje kontenerowe, jak i wybrane usługi systemowe.
-
-Na tym etapie serwer nie jest wystawiony do publicznego internetu. Usługi są dostępne wyłącznie w ramach lokalnej sieci LAN. W przyszłości planowane jest dodanie dostępu przez VPN, aby zapewnić kontrolowany zdalny kanał komunikacji bez bezpośredniego wystawiania usług.
+Pliki Compose są **produkcyjne** (ścieżki jak `/mnt/HomelabData/...`). Na **lab** Ansible tworzy te ścieżki jako zwykłe katalogi na jednym dysku (`ensure-lab-host-paths.yml`). Na **prod** zakłada się, że już istnieją (prawdziwy montaż dysku danych).
 
 ### Kluczowe Decyzje
 
-Pierwsza wersja homelaba opiera się na kilku praktycznych decyzjach:
-
-- Wykorzystanie Dockera jako głównego sposobu uruchamiania usług aplikacyjnych.
-- Utrzymanie serwera wyłącznie w sieci lokalnej zamiast wystawiania go do internetu.
-- Aktywacja Wake-on-LAN, aby ułatwić zarządzanie maszyną.
-- Start od prostej architektury single-host przed dodawaniem większej złożoności.
-- Uwzględnienie monitoringu już na wczesnym etapie przez Prometheusa i Grafanę.
-
-Takie decyzje utrzymują środowisko w zrozumiałej i łatwej do zarządzania formie, jednocześnie zostawiając miejsce na dalszy rozwój.
+- Docker + wspólna sieć `main_network`.
+- Warstwowe playbooki Ansible; domyślny inventory = lab.
+- Sekrety z KWallet; Vault HashiCorp to usługa na serwerze, nie backend Ansible.
+- Wczesny monitoring (Prometheus, Grafana, cAdvisor).
+- NPM jako front HTTP(S); certyfikaty i reguły proxy ręcznie w UI.
 
 ### Kompromisy
 
-Obecna konfiguracja akceptuje kilka kompromisów:
-
-- Serwer jest pojedynczym punktem awarii.
-- Budżet jest celowo ograniczony.
-- Nie ma warstwy wysokiej dostępności.
-- Strategia backupów nie została jeszcze w pełni zaprojektowana.
-- Część prac związanych z hardeningiem i automatyzacją jest nadal w planach.
-
-Na potrzeby nauki i lokalnego eksperymentowania te kompromisy są akceptowalne. Ułatwiają też rozwijanie projektu krok po kroku.
+- Single point of failure, brak HA, ograniczony budżet.
+- Polityka backupu (harmonogramy, restore, retencja) jeszcze niegotowa — zautomatyzowany jest stack Kopii.
+- Pełna walidacja `site.yml` na czystej VM to praca w toku, nie gwarancja produkcyjna.
+- Hardening i VPN — do zrobienia później.
 
 ### Model Bezpieczeństwa
 
-Obecne podejście do bezpieczeństwa jest konserwatywne:
-
-- Usługi są dostępne tylko w lokalnej sieci LAN.
-- Serwer nie jest wystawiony bezpośrednio do publicznego internetu.
-- Logowanie SSH hasłem jest wyłączone; wymagane jest uwierzytelnianie kluczem.
-- Zdalny dostęp przez VPN jest planowany jako przyszłe usprawnienie.
-- Hardening Linuxa jest jednym z celów nauki w ramach projektu.
-
-Model bezpieczeństwa będzie rozwijany wraz z dojrzewaniem homelaba.
+- Usługi tylko w LAN.
+- SSH na kluczu (bez logowania hasłem na serwerze).
+- Brak sekretów w gicie; foldery KWallet `Homelab-lab` / `Homelab-prod`.
+- VPN i dalszy hardening w planach.
 
 ### Status Backupu
 
-Na ten moment kompletna strategia backupu nie została jeszcze zaprojektowana.
+Kompletna strategia backupu nie jest jeszcze zaprojektowana.
 
-To świadomy obszar do dalszej pracy. Homelab zbliżony do środowiska produkcyjnego powinien docelowo obejmować regularne backupy, testy odtwarzania oraz jasny podział między backupami konfiguracji, danych aplikacyjnych i storage'u projektowego.
+Stack [Kopia](https://kopia.io/): `ansible/files/compose/backup-system/`, playbook `apps-tools.yml` (i `site.yml`). UI `51515`, repozytorium `/mnt/HomelabData/homelab-backup`, sekrety KWallet (`KOPIA_*` w `kwallet-keys.md`). Na lab katalogi tworzy Ansible; na prod pochodzą z dysku danych. Sam kontener ≠ gotowa polityka backupu.
 
 ### Wnioski
 
-Jednym z największych zaskoczeń była prostota początkowej konfiguracji. Mimo że sprzęt ma już swoje lata, instalacja oraz pierwsze kroki konfiguracyjne przebiegły bez większych przeszkód.
-
-Projekt pozwolił już zdobyć praktyczne doświadczenie w instalacji i konfiguracji Ubuntu Server od zera. Część obszarów nadal wymaga dalszej pracy, ale bazowy system działa i jest gotowy na kolejne iteracje.
+Początkowa instalacja OS/sprzętu poszła gładko. Ansible ma uczynić stack powtarzalnym na VM przed ruszaniem produkcji.
 
 ### Planowane Usprawnienia
 
-Możliwe dalsze usprawnienia obejmują:
-
-- Zaprojektowanie i wdrożenie poprawnej strategii backupu.
-- Dodanie zdalnego dostępu przez VPN.
-- Rozszerzenie hardeningu Linuxa.
-- Rozbudowę dashboardów monitoringowych.
-- Dodawanie kolejnych usług self-hosted, gdy pojawi się konkretna potrzeba.
-- Dokumentowanie zmian architektury wraz z rozwojem środowiska.
+- Polityka backupu.
+- VPN.
+- Hardening.
+- Runbook NPM/DuckDNS (później ewentualna automatyzacja).
+- Kolejne usługi tylko przy jasnej potrzebie.
+- Spójność README i `ansible/` przy dalszych zmianach.
 
 ### Zakres Repozytorium
 
-To repozytorium skupia się obecnie na dokumentacji. Nie ma na celu dostarczenia kompletnego podejścia infrastructure-as-code, automatyzacji deploymentu ani produkcyjnych plików konfiguracyjnych.
+1. **Ten README** — case study i założenia.
+2. **`ansible/`** — inventory lab/prod, warstwowe playbooki, taski, Compose/Dockerfile, mapa kluczy KWallet, konfiguracja Prometheus/Grafana.
 
-Głównym artefaktem jest ten README, który opisuje uzasadnienie oraz obecny stan homelaba.
+To osobisty setup IaC do nauki przy tym homelabie — nie uniwersalny szablon ani obietnica „production-ready”.
+
+### Ansible (lab vs prod)
+
+Praca zawsze z katalogu `ansible/`. Najpierw: `ansible-galaxy collection install -r requirements.yml`.
+
+- Lab (domyślne w `ansible.cfg`): `ansible-playbook playbooks/<playbook>.yml`
+- Prod (tylko świadomie): `ansible-playbook -i inventory/prod.yml playbooks/<playbook>.yml`
+- Najpierw warstwy osobno; `site.yml` dopiero gdy każda przechodzi sama
+- Warstwy: `ping` → `kwallet-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
+- Nazwy kluczy KWallet: `ansible/files/compose/kwallet-keys.md`
+
+Dell produkcyjny nie jest celem testów. Placeholdery w inventory (`__LAB_HOST__` itd.) uzupełnij lokalnie przed uruchomieniem.
