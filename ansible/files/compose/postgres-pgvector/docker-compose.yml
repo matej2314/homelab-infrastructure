@@ -4,27 +4,29 @@ services:
         container_name: postgres_vector_db
         restart: unless-stopped
         environment:
-            POSTGRES_USER: ${POSTGRESDB_USERNAME}
-            POSTGRES_PASSWORD: ${POSTGRESDB_PASSWORD}
-            POSTGRES_DB: ${POSTGRESDB_DATABASE}
+            POSTGRES_USER: mateo2314
+            POSTGRES_PASSWORD: Ziomal1245*#
+            POSTGRES_DB: postgres_main_db
         networks:
             - main_network
         ports:
-            - '5432:5432'
+            - "5432:5432"
         volumes:
             - pgdata:/var/lib/postgresql/
 
     pgadmin:
-        image: dpage/pgadmin4:9.17
+        image: dpage/pgadmin4:9.18
         container_name: pgadmin
         restart: unless-stopped
+        volumes:
+            - ./pgadmin_data:/var/lib/pgadmin
         environment:
-            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+            PGADMIN_DEFAULT_EMAIL: mateo2314@gmail.com
+            PGADMIN_DEFAULT_PASSWORD: Ziomal1245!!
         networks:
             - main_network
         ports:
-            - '5433:80'
+            - "5433:80"
         depends_on:
             - postgres
 
@@ -33,6 +35,5 @@ volumes:
 
 networks:
     main_network:
-      external: true
-      name: main_network
-
+        external: true
+        name: main_network

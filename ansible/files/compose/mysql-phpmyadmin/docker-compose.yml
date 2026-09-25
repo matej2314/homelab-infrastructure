@@ -6,11 +6,11 @@ services:
         ports:
             - "3306:3306"
         environment:
-            - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+            - MYSQL_ROOT_PASSWORD=Ziomal1245
         image: mysql
         restart: unless-stopped
         volumes:
-            - mysql_data:/var/lib/mysql
+            - ./mysql_data:/var/lib/mysql
 
     phpmyadmin:
         container_name: phpadmin
@@ -25,10 +25,6 @@ services:
             - PMA_ARBITRARY=1
         image: phpmyadmin
 
-volumes:
-    mysql_data:
-
 networks:
     main_network:
-      external: true
-      name: main_network
+        external: true
