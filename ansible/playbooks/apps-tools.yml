@@ -46,3 +46,15 @@
       loop_control:
         loop_var: stack
       when: stack.env_keys | length == 0
+
+    # Post-deploy: filebrowser runs as non-root (UID 1000) but Ansible
+    # copies ./data as root:root. The container needs write access to
+    # create cacheDir (/home/filebrowser/data/tmp) defined in config.yaml.
+    - name: Ensure filebrowser data dir is writable by container user
+      ansible.builtin.file:
+        path: "{{ homelab_root }}/filebrowser-quantum/data"
+        state: directory
+        recurse: true
+        owner: "1000"
+        group: "1000"
+        mode: "0755"

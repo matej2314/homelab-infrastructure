@@ -49,7 +49,7 @@ Single-node LAN-only server. What exists in this repository today:
 
 - Docker Engine, Compose plugin, external Docker network `main_network`
 - Prometheus (listen port `6705`) and node_exporter
-- Grafana from the [official Grafana Labs APT repo](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin credentials from KeePassXC, Prometheus datasource + provisioned dashboard JSON
+- Grafana (listen port `6701`) from the [official Grafana Labs APT repo](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin credentials and port from KeePassXC, Prometheus datasource + provisioned dashboard JSON
 - Operator tools: `btop`, `lazydocker`
 
 **Compose stacks under `ansible/files/compose/` (wired into playbooks / `site.yml`)**
@@ -187,7 +187,7 @@ Serwer single-node, tylko LAN. To, co jest w repo:
 
 - Docker Engine, Compose, sieć `main_network`
 - Prometheus (port `6705`), node_exporter
-- Grafana z [oficjalnego APT Grafana Labs](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin z KeePassXC, datasource Prometheus + dashboard z JSON
+- Grafana (port `6701`) z [oficjalnego APT Grafana Labs](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin i port z KeePassXC, datasource Prometheus + dashboard z JSON
 - `btop`, `lazydocker`
 
 **Stacki Compose (`ansible/files/compose/` → playbooki / `site.yml`)**

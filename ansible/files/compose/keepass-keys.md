@@ -25,5 +25,6 @@ Wartość = pole Password.
 | `FILEBROWSER_ADMIN_PASSWORD` | filebrowser-quantum — hasło admina FileBrowser |
 | `GRAFANA_ADMIN_USER` | system Grafana (`system-services.yml`) — login admina (`GF_SECURITY_ADMIN_USER`) |
 | `GRAFANA_ADMIN_PASSWORD` | system Grafana (`system-services.yml`) — hasło admina (`GF_SECURITY_ADMIN_PASSWORD`); działa przy pierwszym utworzeniu użytkownika |
+| `GRAFANA_SERVER_PORT` | system Grafana (`system-services.yml`) — port HTTP interfejsu (`GF_SERVER_HTTP_PORT`); domyślnie `6701` |
 | `ansible_lab_test` | `keepass-smoke.yml` — sekret testowy ścieżki KeePassXC → plik na serwerze |
 | `vault_root_token` | `apps-vault.yml` — token roota HashiCorp Vault; przechowywany ręcznie, playbook go nie odczytuje |

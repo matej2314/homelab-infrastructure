@@ -20,18 +20,42 @@
         state: present
         update_cache: true
 
+    - name: Clean up leftover deb.griffo.io repo (one-time migration)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/deb-griffo-io.list
+        - /etc/apt/keyrings/deb-griffo-io.gpg
+        - /etc/apt/keyrings/deb-griffo-io.asc
+        - /tmp/deb-griffo-io.asc
+
     - name: Check if lazydocker is installed
       ansible.builtin.command: lazydocker --version
       register: lazydocker_check
       changed_when: false
       failed_when: false
 
-    - name: Install lazydocker via official install script
-      ansible.builtin.shell: |
-        set -euo pipefail
-        curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
-      args:
-        creates: /usr/local/bin/lazydocker
+    - name: Get latest lazydocker version from GitHub API
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/jesseduffield/lazydocker/releases/latest
+        return_content: true
+      register: lazydocker_release
+      when: lazydocker_check.rc != 0
+
+    - name: Install lazydocker binary from GitHub Releases
+      ansible.builtin.unarchive:
+        src: >-
+          https://github.com/jesseduffield/lazydocker/releases/download/
+          {{- lazydocker_release.json.tag_name -}}
+          /lazydocker_
+          {{- lazydocker_release.json.tag_name | regex_replace('^v','') -}}
+          _Linux_x86_64.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - lazydocker
+        mode: "0755"
       when: lazydocker_check.rc != 0
 
     - name: Install Prometheus and node_exporter (Ubuntu packages)
@@ -42,22 +66,90 @@
         state: present
         update_cache: true
 
-    - name: Check whether grafana package is already installed
+    - name: Configure Prometheus listen address ({{ prometheus_listen_port }})
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible — Prometheus listen address (homelab)
+          # Debian/Ubuntu package reads ARGS for the prometheus unit.
+          ARGS="--web.listen-address=0.0.0.0:{{ prometheus_listen_port }}"
+        dest: "{{ prometheus_default_dest }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart prometheus
+
+    - name: Deploy prometheus configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/system/prometheus.yml"
+        dest: "{{ prometheus_config_dest }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart prometheus
+
+    # --- Grafana: credentials drop-in BEFORE package install ---
+    # dpkg postinst does daemon-reload + start; if the drop-in already
+    # exists, Grafana boots with the correct admin credentials on first
+    # install — no masking needed.
+
+    - name: Fetch Grafana admin user from KeePassXC
       ansible.builtin.command:
         argv:
-          - dpkg-query
-          - -W
-          - -f=${Status}
-          - grafana
-      register: grafana_pkg_status
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
+          - GRAFANA_ADMIN_USER
+      delegate_to: localhost
+      become: false
+      register: grafana_admin_user
       changed_when: false
-      failed_when: false
+      no_log: true
 
-    - name: Mask grafana-server before first install (block auto-start without admin env)
-      ansible.builtin.systemd:
-        name: grafana-server
-        masked: true
-      when: grafana_pkg_status.rc != 0
+    - name: Fetch Grafana admin password from KeePassXC
+      ansible.builtin.command:
+        argv:
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
+          - GRAFANA_ADMIN_PASSWORD
+      delegate_to: localhost
+      become: false
+      register: grafana_admin_password
+      changed_when: false
+      no_log: true
+
+    - name: Fetch Grafana server port from KeePassXC
+      ansible.builtin.command:
+        argv:
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
+          - GRAFANA_SERVER_PORT
+      delegate_to: localhost
+      become: false
+      register: grafana_server_port
+      changed_when: false
+      no_log: true
+
+    - name: Ensure grafana systemd drop-in directory exists
+      ansible.builtin.file:
+        path: "{{ grafana_systemd_dropin_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy grafana admin credentials via systemd drop-in
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible — do not edit; secrets from KeePassXC
+          [Service]
+          Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout }}
+          Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout }}
+          Environment=GF_SERVER_HTTP_PORT={{ grafana_server_port.stdout }}
+        dest: "{{ grafana_systemd_dropin }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      notify: Restart grafana
+
+    # --- Grafana: APT install (drop-in already on disk) ---
 
     - name: Install Grafana APT prerequisites
       ansible.builtin.apt:
@@ -90,78 +182,6 @@
         name: grafana
         state: present
         update_cache: true
-
-    - name: Configure Prometheus listen address ({{ prometheus_listen_port }})
-      ansible.builtin.copy:
-        content: |
-          # Managed by Ansible — Prometheus listen address (homelab)
-          # Debian/Ubuntu package reads ARGS for the prometheus unit.
-          ARGS="--web.listen-address=0.0.0.0:{{ prometheus_listen_port }}"
-        dest: "{{ prometheus_default_dest }}"
-        owner: root
-        group: root
-        mode: "0644"
-      notify: Restart prometheus
-
-    - name: Deploy prometheus configuration
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../files/system/prometheus.yml"
-        dest: "{{ prometheus_config_dest }}"
-        owner: root
-        group: root
-        mode: "0644"
-      notify: Restart prometheus
-
-    - name: Fetch Grafana admin user from KeePassXC
-      ansible.builtin.command:
-        argv:
-          - "{{ keepass_script }}"
-          - "{{ keepass_group }}"
-          - GRAFANA_ADMIN_USER
-      delegate_to: localhost
-      become: false
-      register: grafana_admin_user
-      changed_when: false
-      no_log: true
-
-    - name: Fetch Grafana admin password from KeePassXC
-      ansible.builtin.command:
-        argv:
-          - "{{ keepass_script }}"
-          - "{{ keepass_group }}"
-          - GRAFANA_ADMIN_PASSWORD
-      delegate_to: localhost
-      become: false
-      register: grafana_admin_password
-      changed_when: false
-      no_log: true
-
-    - name: Ensure grafana systemd drop-in directory exists
-      ansible.builtin.file:
-        path: "{{ grafana_systemd_dropin_dir }}"
-        state: directory
-        mode: "0755"
-
-    - name: Deploy grafana admin credentials via systemd drop-in
-      ansible.builtin.copy:
-        content: |
-          # Managed by Ansible — do not edit; secrets from KeePassXC
-          [Service]
-          Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout }}
-          Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout }}
-        dest: "{{ grafana_systemd_dropin }}"
-        owner: root
-        group: root
-        mode: "0600"
-      no_log: true
-      register: grafana_dropin
-      notify: Restart grafana
-
-    - name: Unmask grafana-server and reload systemd (drop-in ready)
-      ansible.builtin.systemd:
-        name: grafana-server
-        masked: false
-        daemon_reload: true
 
     - name: Ensure grafana provisioning datasources directory exists
       ansible.builtin.file:
