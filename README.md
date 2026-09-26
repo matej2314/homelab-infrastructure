@@ -49,7 +49,7 @@ Single-node LAN-only server. What exists in this repository today:
 
 - Docker Engine, Compose plugin, external Docker network `main_network`
 - Prometheus (listen port `6705`) and node_exporter
-- Grafana from the [official Grafana Labs APT repo](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin credentials from KWallet, Prometheus datasource + provisioned dashboard JSON
+- Grafana from the [official Grafana Labs APT repo](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin credentials from KeePassXC, Prometheus datasource + provisioned dashboard JSON
 - Operator tools: `btop`, `lazydocker`
 
 **Compose stacks under `ansible/files/compose/` (wired into playbooks / `site.yml`)**
@@ -63,7 +63,7 @@ Single-node LAN-only server. What exists in this repository today:
 | CI | `apps-cicd.yml` | Jenkins (local Dockerfile; Docker socket GID from the host) |
 | Tools | `apps-tools.yml` | cAdvisor (`6700`), it-tools, omni-tools, Stirling PDF (`7070`), Trilium Notes (`7080`), FileBrowser Quantum, Homarr (`7575`), Redis Stack (`6379`), Kopia backup UI (`51515`) |
 
-Secrets used by Compose and Grafana are read from **KDE Wallet** on the control node (see `ansible/files/compose/kwallet-keys.md`). Values are never committed; Ansible may write short-lived `.env` files on the server with mode `0600`.
+Secrets used by Compose and Grafana are read from **KeePassXC** on the control node (database `projects`, group `homelab-infrastructure`, subgroups `lab` and `prod`; see `ansible/files/compose/keepass-keys.md`). `scripts/run-playbook.sh` prompts for the master password once per playbook run and keeps it in memory. Values are never committed; Ansible may write short-lived `.env` files on the server with mode `0600`.
 
 Also in scope operationally (not fully automated here): Wake-on-LAN; local storage under `/mnt/HomelabData` on the Dell.
 
@@ -77,7 +77,7 @@ Compose files are treated as **production-shaped** copies (paths such as `/mnt/H
 
 - Docker + one external network `main_network` for application stacks.
 - Ansible layered playbooks; default inventory is lab, never prod by accident.
-- Secrets from KWallet on Kubuntu; HashiCorp Vault is an app on the server, not the Ansible secret backend.
+- Secrets from KeePassXC via `keepassxc-cli` on the control node. HashiCorp Vault is an app on the server, not the Ansible secret backend.
 - Monitoring early (Prometheus, Grafana, cAdvisor).
 - NPM as the intended HTTP(S) front; certificate and proxy rules stay manual in the UI.
 
@@ -92,14 +92,14 @@ Compose files are treated as **production-shaped** copies (paths such as `/mnt/H
 
 - LAN-only services; no intentional public exposure of the server.
 - SSH key authentication (password login disabled on the server).
-- No secret values in git; KWallet folders `Homelab-lab` / `Homelab-prod`.
+- No secret values in git. KeePassXC database `projects`, groups `homelab-infrastructure/lab` and `homelab-infrastructure/prod`. The master password is not stored in the repo.
 - VPN and further hardening are planned improvements.
 
 ### Backup Status
 
 A complete backup strategy has not been designed yet.
 
-The [Kopia](https://kopia.io/) stack is in `ansible/files/compose/backup-system/`, deployed by `apps-tools.yml` (and `site.yml`). UI on port `51515`; repository path `/mnt/HomelabData/homelab-backup`; secrets via KWallet (`KOPIA_*` keys in `kwallet-keys.md`). On lab, Ansible creates the path directories; on prod they come from the real data disk. Deploying the container is not the same as a finished backup policy.
+The [Kopia](https://kopia.io/) stack is in `ansible/files/compose/backup-system/`, deployed by `apps-tools.yml` (and `site.yml`). UI on port `51515`; repository path `/mnt/HomelabData/homelab-backup`; secrets via KeePassXC (`KOPIA_*` keys in `keepass-keys.md`). On lab, Ansible creates the path directories; on prod they come from the real data disk. Deploying the container is not the same as a finished backup policy.
 
 ### Lessons Learned
 
@@ -119,19 +119,28 @@ Initial OS and hardware setup was smoother than expected. The project already pr
 This repository contains:
 
 1. **This README** — case study, assumptions, trade-offs.
-2. **`ansible/`** — inventories (lab/prod), layered playbooks, shared tasks, Compose/Dockerfile assets, KWallet key map, Grafana/Prometheus configs.
+2. **`ansible/`** — inventories (lab/prod), layered playbooks, shared tasks, Compose/Dockerfile assets, KeePassXC key map, Grafana/Prometheus configs.
 
 It is a personal learning IaC setup for this homelab, not a generic public template or a claim of production-hardened automation.
 
 ### Ansible (lab vs prod)
 
-Always work from the `ansible/` directory. Install collections first: `ansible-galaxy collection install -r requirements.yml`.
+Always work from the `ansible/` directory. Install collections first: `ansible-galaxy collection install -r requirements.yml`. On the control node install the `keepassxc` package (`keepassxc-cli`).
 
-- Lab (default in `ansible.cfg`): `ansible-playbook playbooks/<playbook>.yml`
-- Prod (intentional only): `ansible-playbook -i inventory/prod.yml playbooks/<playbook>.yml`
-- Prefer one layer at a time; full stack: `ansible-playbook playbooks/site.yml` only after each layer works alone
-- Layers: `ping` → `kwallet-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
-- Required KWallet key names: `ansible/files/compose/kwallet-keys.md`
+Export the database path in the shell (path only, not the master password):
+
+```bash
+export HOMELAB_KEEPASS_DB=/path/to/projects.kdbx
+```
+
+Run playbooks through `scripts/run-playbook.sh`. It prompts once for the KeePassXC master password, keeps it in process memory for that run, and execs `ansible-playbook`. The password is not written to a file.
+
+- Lab (default in `ansible.cfg`): `./scripts/run-playbook.sh playbooks/<playbook>.yml`
+- Prod (intentional only): `./scripts/run-playbook.sh -i inventory/prod.yml playbooks/<playbook>.yml`
+- Prefer one layer at a time; full stack: `./scripts/run-playbook.sh playbooks/site.yml` only after each layer works alone
+- Each invocation prompts again. A finished playbook drops the master password.
+- Layers: `ping` → `keepass-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
+- Required KeePassXC entry titles: `ansible/files/compose/keepass-keys.md` (database `projects`, group `homelab-infrastructure`, subgroups `lab` and `prod`)
 
 The production Dell is not a test target. Fill inventory placeholders (`__LAB_HOST__`, and so on) locally before running playbooks.
 
@@ -178,7 +187,7 @@ Serwer single-node, tylko LAN. To, co jest w repo:
 
 - Docker Engine, Compose, sieć `main_network`
 - Prometheus (port `6705`), node_exporter
-- Grafana z [oficjalnego APT Grafana Labs](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin z KWallet, datasource Prometheus + dashboard z JSON
+- Grafana z [oficjalnego APT Grafana Labs](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/), admin z KeePassXC, datasource Prometheus + dashboard z JSON
 - `btop`, `lazydocker`
 
 **Stacki Compose (`ansible/files/compose/` → playbooki / `site.yml`)**
@@ -192,7 +201,7 @@ Serwer single-node, tylko LAN. To, co jest w repo:
 | CI | `apps-cicd.yml` | Jenkins (lokalny Dockerfile; GID Dockera z hosta) |
 | Narzędzia | `apps-tools.yml` | cAdvisor (`6700`), it-tools, omni-tools, Stirling PDF (`7070`), Trilium (`7080`), FileBrowser, Homarr (`7575`), Redis Stack (`6379`), Kopia (`51515`) |
 
-Sekrety: **KDE Wallet** na control node (`ansible/files/compose/kwallet-keys.md`), bez wartości w gicie. Ansible może zapisać `.env` na serwerze z uprawnieniami `0600`.
+Sekrety: **KeePassXC** na control node (baza `projects`, grupa `homelab-infrastructure`, podgrupy `lab` i `prod`; `ansible/files/compose/keepass-keys.md`). `scripts/run-playbook.sh` pyta o hasło główne raz na playbook i trzyma je w pamięci. Bez wartości w gicie. Ansible może zapisać `.env` na serwerze z uprawnieniami `0600`.
 
 Poza pełną automatyzacją w repo: Wake-on-LAN; storage pod `/mnt/HomelabData` na Dellu.
 
@@ -206,7 +215,7 @@ Pliki Compose są **produkcyjne** (ścieżki jak `/mnt/HomelabData/...`). Na **l
 
 - Docker + wspólna sieć `main_network`.
 - Warstwowe playbooki Ansible; domyślny inventory = lab.
-- Sekrety z KWallet; Vault HashiCorp to usługa na serwerze, nie backend Ansible.
+- Sekrety z KeePassXC przez `keepassxc-cli`. Vault HashiCorp to usługa na serwerze, nie backend Ansible.
 - Wczesny monitoring (Prometheus, Grafana, cAdvisor).
 - NPM jako front HTTP(S); certyfikaty i reguły proxy ręcznie w UI.
 
@@ -221,14 +230,14 @@ Pliki Compose są **produkcyjne** (ścieżki jak `/mnt/HomelabData/...`). Na **l
 
 - Usługi tylko w LAN.
 - SSH na kluczu (bez logowania hasłem na serwerze).
-- Brak sekretów w gicie; foldery KWallet `Homelab-lab` / `Homelab-prod`.
+- Brak sekretów w gicie. Baza KeePassXC `projects`, grupy `homelab-infrastructure/lab` i `homelab-infrastructure/prod`. Hasła głównego nie ma w repozytorium.
 - VPN i dalszy hardening w planach.
 
 ### Status Backupu
 
 Kompletna strategia backupu nie jest jeszcze zaprojektowana.
 
-Stack [Kopia](https://kopia.io/): `ansible/files/compose/backup-system/`, playbook `apps-tools.yml` (i `site.yml`). UI `51515`, repozytorium `/mnt/HomelabData/homelab-backup`, sekrety KWallet (`KOPIA_*` w `kwallet-keys.md`). Na lab katalogi tworzy Ansible; na prod pochodzą z dysku danych. Sam kontener ≠ gotowa polityka backupu.
+Stack [Kopia](https://kopia.io/): `ansible/files/compose/backup-system/`, playbook `apps-tools.yml` (i `site.yml`). UI `51515`, repozytorium `/mnt/HomelabData/homelab-backup`, sekrety KeePassXC (`KOPIA_*` w `keepass-keys.md`). Na lab katalogi tworzy Ansible; na prod pochodzą z dysku danych. Sam kontener ≠ gotowa polityka backupu.
 
 ### Wnioski
 
@@ -246,18 +255,27 @@ Początkowa instalacja OS/sprzętu poszła gładko. Ansible ma uczynić stack po
 ### Zakres Repozytorium
 
 1. **Ten README** — case study i założenia.
-2. **`ansible/`** — inventory lab/prod, warstwowe playbooki, taski, Compose/Dockerfile, mapa kluczy KWallet, konfiguracja Prometheus/Grafana.
+2. **`ansible/`** — inventory lab/prod, warstwowe playbooki, taski, Compose/Dockerfile, mapa kluczy KeePassXC, konfiguracja Prometheus/Grafana.
 
 To osobisty setup IaC do nauki przy tym homelabie — nie uniwersalny szablon ani obietnica „production-ready”.
 
 ### Ansible (lab vs prod)
 
-Praca zawsze z katalogu `ansible/`. Najpierw: `ansible-galaxy collection install -r requirements.yml`.
+Praca zawsze z katalogu `ansible/`. Najpierw: `ansible-galaxy collection install -r requirements.yml`. Na control node pakiet `keepassxc` (`keepassxc-cli`).
 
-- Lab (domyślne w `ansible.cfg`): `ansible-playbook playbooks/<playbook>.yml`
-- Prod (tylko świadomie): `ansible-playbook -i inventory/prod.yml playbooks/<playbook>.yml`
+W shellu ustaw ścieżkę bazy (sama ścieżka, bez hasła głównego):
+
+```bash
+export HOMELAB_KEEPASS_DB=/ścieżka/do/projects.kdbx
+```
+
+Playbooki odpalaj przez `scripts/run-playbook.sh`. Skrypt raz pyta o hasło główne KeePassXC, trzyma je w pamięci procesu i uruchamia `ansible-playbook`. Hasło nie trafia do pliku.
+
+- Lab (domyślne w `ansible.cfg`): `./scripts/run-playbook.sh playbooks/<playbook>.yml`
+- Prod (tylko świadomie): `./scripts/run-playbook.sh -i inventory/prod.yml playbooks/<playbook>.yml`
 - Najpierw warstwy osobno; `site.yml` dopiero gdy każda przechodzi sama
-- Warstwy: `ping` → `kwallet-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
-- Nazwy kluczy KWallet: `ansible/files/compose/kwallet-keys.md`
+- Każde uruchomienie pyta od nowa. Koniec playbooka kończy życie hasła głównego.
+- Warstwy: `ping` → `keepass-smoke` → `bootstrap` → `system-services` → `apps-proxy` → `apps-vault` → `apps-data` → `apps-ai` → `apps-cicd` → `apps-tools`
+- Nazwy kluczy KeePassXC: `ansible/files/compose/keepass-keys.md` (baza `projects`, grupa `homelab-infrastructure`, podgrupy `lab` i `prod`)
 
 Dell produkcyjny nie jest celem testów. Placeholdery w inventory (`__LAB_HOST__` itd.) uzupełnij lokalnie przed uruchomieniem.
