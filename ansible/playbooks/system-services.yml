@@ -3,7 +3,7 @@
   hosts: homelab
   become: true
   vars:
-    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    keepass_script: "{{playbook_dir}}/../scripts/keepass-get.sh"
     prometheus_listen_port: 6705
     prometheus_config_dest: /etc/prometheus/prometheus.yml
     prometheus_default_dest: /etc/default/prometheus
@@ -112,11 +112,11 @@
         mode: "0644"
       notify: Restart prometheus
 
-    - name: Fetch Grafana admin user from KWallet
+    - name: Fetch Grafana admin user from KeePassXC
       ansible.builtin.command:
         argv:
-          - "{{ kwallet_script }}"
-          - "{{ kwallet_folder }}"
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
           - GRAFANA_ADMIN_USER
       delegate_to: localhost
       become: false
@@ -124,11 +124,11 @@
       changed_when: false
       no_log: true
 
-    - name: Fetch Grafana admin password from KWallet
+    - name: Fetch Grafana admin password from KeePassXC
       ansible.builtin.command:
         argv:
-          - "{{ kwallet_script }}"
-          - "{{ kwallet_folder }}"
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
           - GRAFANA_ADMIN_PASSWORD
       delegate_to: localhost
       become: false
@@ -145,7 +145,7 @@
     - name: Deploy grafana admin credentials via systemd drop-in
       ansible.builtin.copy:
         content: |
-          # Managed by Ansible — do not edit; secrets from KWallet
+          # Managed by Ansible — do not edit; secrets from KeePassXC
           [Service]
           Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout }}
           Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout }}

@@ -11,14 +11,14 @@
     dest: "{{ homelab_root }}/{{ stack.name }}/"
     mode: "0644"
 
-- name: "Build .env lines for {{ stack.name }} from KWallet"
+- name: "Build .env lines for {{ stack.name }} from KeePassXC"
   ansible.builtin.shell: |
     set -euo pipefail
-    SCRIPT="{{ kwallet_script }}"
-    FOLDER="{{ kwallet_folder }}"
+    SCRIPT="{{ keepass_script }}"
+    GROUP="{{keepass_group}}"
     {
     {% for item in stack.env_keys %}
-      VAL=$("$SCRIPT" "$FOLDER" "{{ item.key }}")
+      VAL=$("$SCRIPT" "$GROUP" "{{ item.key }}")
       printf '%s=%s\n' "{{ item.env }}" "$VAL"
     {% endfor %}
     }

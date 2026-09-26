@@ -29,5 +29,6 @@
     - name: Reminder — init/unseal is manual / documented, not every-run
       ansible.builtin.debug:
         msg: >-
-          Do not re-init on rerun. Store root token / unseal keys in KWallet
-          (vault_root_token). Ansible does not unseal blindly in v1.
+          Do not re-init on rerun.
+          Store root token (vault_root_token) and unseal keys in KeepassXC under homelab-infrastructure/{{keepass_group}}.
+          Ansible does not unseal blindly.

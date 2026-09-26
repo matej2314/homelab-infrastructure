@@ -10,4 +10,4 @@ all:
           ansible_python_interpreter: auto_silent
       vars:
         homelab_env: lab
-        kwallet_folder: Homelab-lab
+        keepass_group: lab

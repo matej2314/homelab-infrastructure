@@ -3,7 +3,7 @@
   hosts: homelab
   become: true
   vars:
-    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    keepass_script: "{{playbook_dir}}/../scripts/keepass-get.sh"
     tool_stacks:
       - name: cadvisor
         env_keys: []

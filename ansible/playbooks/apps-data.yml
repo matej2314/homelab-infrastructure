@@ -3,7 +3,7 @@
   hosts: homelab
   become: true
   vars:
-    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
+    keepass_script: "{{playbook_dir}}/../scripts/keepass-get.sh"
     db_stacks:
       - name: mysql-phpmyadmin
         env_keys:

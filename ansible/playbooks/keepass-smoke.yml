@@ -1,27 +1,27 @@
 ---
-- name: KWallet smoke — write one secret to remote file or fail hard
+- name: KeePassXC smoke — write one secret to remote file or fail hard
   hosts: homelab
   gather_facts: false
   become: false
   vars:
-    kwallet_script: "{{ playbook_dir }}/../scripts/kwallet-get.sh"
-    remote_test_path: /tmp/homelab-kwallet-smoke
+    keepass_script: "{{ playbook_dir }}/../scripts/keepass-get.sh"
+    remote_test_path: /tmp/homelab-keepass-smoke
   tasks:
-    - name: Fetch test secret from KWallet on control node
+    - name: Fetch test secret from KeePassXC on control node
       ansible.builtin.command:
         argv:
-          - "{{ kwallet_script }}"
-          - "{{ kwallet_folder }}"
+          - "{{ keepass_script }}"
+          - "{{ keepass_group }}"
           - ansible_lab_test
       delegate_to: localhost
       become: false
-      register: kwallet_test
+      register: keepass_test
       changed_when: false
       no_log: true
 
     - name: Write secret to remote file with mode 0600
       ansible.builtin.copy:
-        content: "{{ kwallet_test.stdout }}"
+        content: "{{ keepass_test.stdout }}"
         dest: "{{ remote_test_path }}"
         mode: "0600"
       no_log: true

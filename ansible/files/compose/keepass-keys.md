@@ -1,7 +1,13 @@
-# Mapa kluczy KWallet (bez wartości)
+# Mapa kluczy KeePassXC (bez wartości)
 
-Folder lab: `Homelab-lab`
-Folder prod: `Homelab-prod`
+Baza: `projects`.
+Grupa repozytorium: `homelab-infrastructure`
+Podgrupa lab: `lab` (inventory `keepass_group`)
+Podgrupa prod: `prod`
+
+Tytuł wpisu = nazwa klucza.
+Wartość = pole Password.
+Ścieżka CLI = `homelab-infrastructure/<lab|prod>/<klucz>`.
 
 | Klucz | Stack / użycie |
 |---|---|
@@ -19,5 +25,5 @@ Folder prod: `Homelab-prod`
 | `FILEBROWSER_ADMIN_PASSWORD` | filebrowser-quantum — hasło admina FileBrowser |
 | `GRAFANA_ADMIN_USER` | system Grafana (`system-services.yml`) — login admina (`GF_SECURITY_ADMIN_USER`) |
 | `GRAFANA_ADMIN_PASSWORD` | system Grafana (`system-services.yml`) — hasło admina (`GF_SECURITY_ADMIN_PASSWORD`); działa przy pierwszym utworzeniu użytkownika |
-| `ansible_lab_test` | `kwallet-smoke.yml` — sekret testowy ścieżki KWallet → plik na serwerze |
-
+| `ansible_lab_test` | `keepass-smoke.yml` — sekret testowy ścieżki KeePassXC → plik na serwerze |
+| `vault_root_token` | `apps-vault.yml` — token roota HashiCorp Vault; przechowywany ręcznie, playbook go nie odczytuje |
