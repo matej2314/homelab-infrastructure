@@ -16598,11 +16598,7 @@
     "list": [
       {
         "allowCustomValue": true,
-        "current": {
-          "text": "",
-          "value": "${DS_PROMETHEUS}",
-          "selected": true
-        },
+        "current": {},
         "includeAll": false,
         "label": "Datasource",
         "name": "ds_prometheus",
