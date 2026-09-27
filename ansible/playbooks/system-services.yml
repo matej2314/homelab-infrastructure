@@ -139,9 +139,9 @@
         content: |
           # Managed by Ansible — do not edit; secrets from KeePassXC
           [Service]
-          Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout }}
-          Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout }}
-          Environment=GF_SERVER_HTTP_PORT={{ grafana_server_port.stdout }}
+          Environment=GF_SECURITY_ADMIN_USER={{ grafana_admin_user.stdout | trim }}
+          Environment=GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password.stdout | trim }}
+          Environment=GF_SERVER_HTTP_PORT={{ grafana_server_port.stdout | trim }}
         dest: "{{ grafana_systemd_dropin }}"
         owner: root
         group: root
@@ -242,6 +242,19 @@
         state: started
         enabled: true
 
+    - name: Ensure grafana.db ownership is correct (fix root-owned db after first install)
+      ansible.builtin.file:
+        path: /var/lib/grafana/grafana.db
+        owner: grafana
+        group: grafana
+        mode: "0640"
+      failed_when: false  # plik może nie istnieć przy pierwszym uruchomieniu
+
+    - name: Fix ownership of /var/lib/grafana recursively (only owner/group, no mode change)
+      ansible.builtin.command:
+        cmd: chown -R grafana:grafana /var/lib/grafana
+      changed_when: false
+
     - name: Enable and start grafana
       ansible.builtin.service:
         name: grafana-server
@@ -255,6 +268,7 @@
         state: restarted
 
     - name: Restart grafana
-      ansible.builtin.service:
+      ansible.builtin.systemd:
         name: grafana-server
         state: restarted
+        daemon_reload: true
