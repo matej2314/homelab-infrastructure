@@ -6,7 +6,9 @@ services:
     command: server
     restart: unless-stopped
 
-    user: "0:0"
+    # Official image user is vault (uid 100, gid 1000). The entrypoint does not
+    # chown /vault/data, so the bind mount must already belong to this user.
+    user: "100:1000"
 
     environment:
       VAULT_ADDR: "https://vault-lab:8200"

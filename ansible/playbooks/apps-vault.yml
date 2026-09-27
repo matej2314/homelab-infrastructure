@@ -19,6 +19,30 @@
         dest: "{{ stack_dest }}/"
         mode: "0644"
 
+    # Raft opens /vault/data/vault.db as uid 100. Ansible and Docker create
+    # the bind-mount directory as root, which the vault user cannot write.
+    - name: Ensure Vault data and logs directories exist
+      ansible.builtin.file:
+        path: "{{ stack_dest }}/{{ item }}"
+        state: directory
+        owner: "100"
+        group: "1000"
+        mode: "0750"
+      loop:
+        - vault_data
+        - vault_logs
+
+    - name: Ensure existing Vault data and logs are owned by the container user
+      ansible.builtin.file:
+        path: "{{ stack_dest }}/{{ item }}"
+        state: directory
+        owner: "100"
+        group: "1000"
+        recurse: true
+      loop:
+        - vault_data
+        - vault_logs
+
     - name: Deploy Vault container
       community.docker.docker_compose_v2:
         project_src: "{{ stack_dest }}"
