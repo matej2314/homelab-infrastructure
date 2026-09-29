@@ -1,0 +1,96 @@
+---
+- name: Normalize forward_host (host gateway placeholder)
+  ansible.builtin.set_fact:
+    npm_forward_host: >-
+      {{
+      npm_host_gateway
+      if desired_host.forward_host == '__NPM_HOST_GATEWAY__'
+      else desired_host.forward_host
+      }}
+
+- name: Build desired proxy-host payload
+  ansible.builtin.set_fact:
+    npm_proxy_host_payload:
+      domain_names: "{{desired_host.domain_names}}"
+      forward_scheme: "{{desired_host.forward_scheme}}"
+      forward_host: "{{npm_forward_host}}"
+      forward_port: "{{desired_host.forward_port | int}}"
+      certificate_id: "{{npm_wildcard_cert_id | int}}"
+      ssl_forced: "{{desired_host.ssl_forced | default(true)}}"
+      allow_websocket_upgrade: "{{desired_host.allow_websocket_upgrade | default(false)}}"
+      http2_support: "{{desired_host.http2_support | default(true)}}"
+      hsts_enabled: "{{desired_host.hsts_enabled | default(false)}}"
+      hsts_subdomains: "{{desired_host.hsts_subdomains | default(false)}}"
+      caching_enabled: "{{desired_host.caching_enabled | default(false)}}"
+      block_exploits: "{{desired_host.block_exploits | default(true)}}"
+      advanced_config: "{{desired_host.advanced_config | default('')}}"
+      enabled: "{{desired_host.enabled | default(true)}}"
+      access_list_id: 0
+      locations: []
+      meta: {}
+
+- name: Find existing proxy host by first domain
+  ansible.builtin.set_fact:
+    npm_matched_host: >-
+      {{
+      npm_proxy_hosts_list.json
+      | selectattr('domain_names', 'defined')
+      | selectattr('domain_names', 'contains', desired_host.domain_names[0])
+      | list
+      | first
+      | default(none)
+      }}
+
+- name: Create proxy host
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/nginx/proxy-hosts"
+    method: POST
+    headers:
+      Authorization: "Bearer {{npm_api_token}}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{npm_proxy_host_payload}}"
+    status_code: [201]
+    timeout: "{{npm_api_timeout}}"
+  register: npm_host_create
+  when: npm_matched_host is none
+  changed_when: npm_host_create.status == 201
+  no_log: true
+
+- name: Refresh proxy hosts list after create
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/nginx/proxy-hosts"
+    method: GET
+    headers:
+      Authorization: "Bearer {{npm_api_token}}"
+    status_code: 200
+    timeout: "{{npm_api_timeout}}"
+  register: npm_proxy_hosts_list
+  when: npm_host_create is changed
+  no_log: true
+
+- name: Update proxy host when drifted
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/nginx/proxy-hosts/{{npm_matched_host.id}}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{npm_api_token}}"
+      Content-Type: application/json
+    body_format: json
+    body: "{{npm_proxy_host_payload}}"
+    status_code: [200]
+    timeout: "{{npm_api_timeout}}"
+  register: npm_host_update
+  changed_when: npm_host_update.status == 200
+  no_log: true
+  when:
+    - npm_matched_host is not none
+    - >
+      npm_matched_host.forward_host != npm_proxy_host_payload.forward_host
+      or (npm_matched_host.forward_port | int) != (npm_proxy_host_payload.forward_port | int)
+      or npm_matched_host.forward_scheme != npm_proxy_host_payload.forward_scheme
+      or (npm_matched_host.certificate_id | int) != (npm_proxy_host_payload.certificate_id | int)
+      or (npm_matched_host.ssl_forced | bool) != (npm_proxy_host_payload.ssl_forced | bool)
+      or (npm_matched_host.allow_websocket_upgrade | bool) != (npm_proxy_host_payload.allow_websocket_upgrade | bool)
+      or (npm_matched_host.block_exploits | bool) != (npm_proxy_host_payload.block_exploits | bool)
+      or (npm_matched_host.advanced_config | default('')) != (npm_proxy_host_payload.advanced_config | default(''))

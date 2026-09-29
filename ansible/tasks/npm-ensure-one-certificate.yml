@@ -1,0 +1,67 @@
+---
+# Match by nice_name (stable identity), not by domain_names list — the latter is
+# order-sensitive with 'equalto' and would risk a duplicate re-issue (LE rate limit)
+# if NPM ever returns the domains in a different order than ssl_certs.json.
+- name: Find existing certificate by nice_name
+  ansible.builtin.set_fact:
+    npm_matched_cert: >-
+      {{
+      npm_certs_list.json
+      | selectattr('nice_name', 'defined')
+      | selectattr('nice_name', 'equalto', desired_cert.nice_name)
+      | list
+      | first
+      | default(none)
+      }}
+
+- name: Create certificate when missing (DNS-01 DuckDNS)
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/nginx/certificates"
+    method: POST
+    headers:
+      Authorization: "Bearer {{npm_api_token}}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      provider: "{{desired_cert.provider}}"
+      nice_name: "{{desired_cert.nice_name | default(desired_cert.domain_names[0])}}"
+      domain_names: "{{desired_cert.domain_names}}"
+      meta:
+        dns_challenge: "{{desired_cert.dns_challenge | default(true)}}"
+        dns_provider: "{{desired_cert.dns_provider}}"
+        dns_provider_credentials: "dns_duckdns_token={{npm_duckdns_token.stdout}}"
+        propagation_seconds: "{{desired_cert.propagation_seconds | default(120)}}"
+        key_type: "{{desired_cert.key_type | default('ecdsa')}}"
+    status_code: [201]
+    timeout: "{{npm_api_timeout}}"
+  register: npm_cert_create
+  when: npm_matched_cert is none
+  changed_when: npm_cert_create.status == 201
+  no_log: true
+
+- name: Refresh certificate list after create
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/nginx/certificates"
+    method: GET
+    headers:
+      Authorization: "Bearer {{npm_api_token}}"
+    status_code: 200
+    timeout: "{{npm_api_timeout}}"
+  register: npm_certs_list
+  when: npm_cert_create is changed
+  no_log: true
+
+- name: Resolve certificate id for later proxy-host binding
+  ansible.builtin.set_fact:
+    npm_cert_ids_by_nice_name: >-
+      {{
+      (npm_cert_ids_by_nice_name | default({}))
+      | combine({
+        (desired_cert.nice_name): (
+          npm_matched_cert.id
+          if npm_matched_cert is not none
+          else npm_cert_create.json.id
+        )
+      })
+      }}
+  no_log: true

@@ -1,0 +1,14 @@
+[
+    {
+        "nice_name": "matejlab.duckdns.org",
+        "provider": "letsencrypt",
+        "domain_names": [
+            "matejlab.duckdns.org",
+            "*.matejlab.duckdns.org"
+        ],
+        "dns_challenge": true,
+        "dns_provider": "duckdns",
+        "propagation_seconds": 120,
+        "key_type": "ecdsa"
+    }
+]

@@ -22,3 +22,6 @@
 
 - name: Homelab site — tools
   ansible.builtin.import_playbook: apps-tools.yml
+
+- name: Homelab site — NPM API config (certs + proxy hosts)
+  ansible.builtin.import_playbook: apps-proxy-config.yml

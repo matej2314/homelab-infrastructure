@@ -25,3 +25,9 @@ homelab_stacks:
   - dashboard
   - redis
   - backup-system
+
+# --- Nginx Proxy Manager (API config) ---
+npm_api_url: "http://127.0.0.1:81/api"
+npm_api_timeout: 30
+npm_cert_timeout: 900
+npm_host_gateway: "172.17.0.1"

@@ -1,0 +1,34 @@
+---
+- name: Layer 3g - NPM API config (SSL certs + proxy hosts)
+  hosts: homelab
+  become: true
+  tags: [npm-config]
+  vars:
+    keepass_script: "{{playbook_dir}}/../scripts/keepass-get.sh"
+    npm_ssl_certs_file: "{{playbook_dir}}/../files/compose/nginx-proxy-manager/ssl_certs.json"
+    npm_proxy_hosts_file: "{{playbook_dir}}/../files/compose/nginx-proxy-manager/proxy_hosts.json"
+  # Tag usage: the sub-tags npm-login / npm-certs / npm-hosts only SCOPE tasks within
+  # a full run — they are NOT independently runnable. Proxy hosts need the bearer token
+  # from the login stage and the wildcard certificate_id resolved by the certs stage,
+  # which in turn needs the token. For a standalone run always execute the whole
+  # playbook, or use `--tags npm-config`, which runs login -> certs -> hosts in order.
+  tasks:
+    - name: Load desired SSL certificates declaration
+      ansible.builtin.set_fact:
+        npm_desired_certs: "{{lookup('file', npm_ssl_certs_file) | from_json}}"
+
+    - name: Load desired proxy hosts declaration
+      ansible.builtin.set_fact:
+        npm_desired_hosts: "{{lookup('file', npm_proxy_hosts_file) | from_json | rejectattr('domain_names', 'undefined') | list}}"
+
+    - name: Authenticate to NPM API
+      ansible.builtin.include_tasks: ../tasks/npm-api-login.yml
+      tags: [npm-config, npm-login]
+
+    - name: Ensure NPM certificates (DuckDNS DNS-01)
+      ansible.builtin.include_tasks: ../tasks/npm-ensure-certificates.yml
+      tags: [npm-config, npm-certs]
+
+    - name: Ensure NPM proxy hosts
+      ansible.builtin.include_tasks: ../tasks/npm-ensure-proxy-hosts.yml
+      tags: [npm-config, npm-hosts]

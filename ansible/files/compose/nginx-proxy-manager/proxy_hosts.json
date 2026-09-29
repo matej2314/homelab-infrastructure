@@ -1,0 +1,183 @@
+[
+    {
+        "name": "Nginx Proxy Manager",
+        "domain_names": [
+            "proxy.matejlab.duckdns.org"
+        ],
+        "forward_host": "nginx_proxy",
+        "forward_port": 81,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": true,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Kopia backup system",
+        "domain_names": [
+            "backup.matejlab.duckdns.org"
+        ],
+        "forward_host": "kopia",
+        "forward_port": 51515,
+        "forward_scheme": "https",
+        "allow_websocket_upgrade": true,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Homarr dashboard",
+        "domain_names": [
+            "control.matejlab.duckdns.org"
+        ],
+        "forward_host": "lab-dashboard",
+        "forward_port": 7575,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Ollama embedding instance",
+        "domain_names": [
+            "embed.matejlab.duckdns.org"
+        ],
+        "forward_host": "ollama-embedding",
+        "forward_port": 11434,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "It Tools App",
+        "domain_names": [
+            "it-tools.matejlab.duckdns.org"
+        ],
+        "forward_host": "it-tools",
+        "forward_port": 8080,
+        "forward_scheme": "http",
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Jenkins homelab instance",
+        "domain_names": [
+            "jenkins.matejlab.duckdns.org"
+        ],
+        "forward_host": "jenkins",
+        "forward_port": 8080,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Custom MCP homelab instance",
+        "domain_names": [
+            "matej-mcp.matejlab.duckdns.org"
+        ],
+        "forward_host": "mateo2314_mcp_server",
+        "forward_port": 8090,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": true,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Trilium notes homelab instance",
+        "domain_names": [
+            "notes.matejlab.duckdns.org"
+        ],
+        "forward_host": "trilium",
+        "forward_port": 8080,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Omni tools homelab instance",
+        "domain_names": [
+            "omni.matejlab.duckdns.org"
+        ],
+        "forward_host": "omni-tools",
+        "forward_port": 80,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "block_exploits": true,
+        "ssl_forced": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Stirling PDF app homelab instance",
+        "domain_names": [
+            "pdftool.matejlab.duckdns.org"
+        ],
+        "forward_host": "stirling-pdf",
+        "forward_port": 8080,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "PG ADMIN homelab instance",
+        "domain_names": [
+            "pgadmin.matejlab.duckdns.org"
+        ],
+        "forward_host": "pgadmin",
+        "forward_port": 80,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "phpMyAdmin homelab instance",
+        "domain_names": [
+            "phpadmin.matejlab.duckdns.org"
+        ],
+        "forward_host": "phpadmin",
+        "forward_port": 80,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Filebrowser Quantum homelab instance",
+        "domain_names": [
+            "storage.matejlab.duckdns.org"
+        ],
+        "forward_host": "filebrowser",
+        "forward_port": 80,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    },
+    {
+        "name": "Hashicorp Vault homelab instance",
+        "domain_names": [
+            "vault.matejlab.duckdns.org"
+        ],
+        "forward_host": "vault-lab",
+        "forward_port": 8200,
+        "forward_scheme": "http",
+        "allow_websocket_upgrade": false,
+        "ssl_forced": true,
+        "block_exploits": true,
+        "advanced_config": ""
+    }
+]

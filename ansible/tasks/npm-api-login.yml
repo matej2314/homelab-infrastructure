@@ -1,0 +1,55 @@
+---
+- name: Fetch NPM admin email from KeepassXC
+  ansible.builtin.command:
+    argv:
+      - "{{keepass_script}}"
+      - "{{keepass_group}}"
+      - NPM_ADMIN_EMAIL
+  delegate_to: localhost
+  become: false
+  register: npm_admin_email
+  changed_when: false
+  no_log: true
+
+- name: Fetch NPM admin password from KeepassXC
+  ansible.builtin.command:
+    argv:
+      - "{{keepass_script}}"
+      - "{{keepass_group}}"
+      - NPM_ADMIN_PASSWORD
+  delegate_to: localhost
+  become: false
+  register: npm_admin_password
+  changed_when: false
+  no_log: true
+
+- name: Wait until NPM API responds
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}"
+    method: GET
+    status_code: [200, 401]
+    timeout: "{{npm_api_timeout}}"
+  register: npm_api_health
+  retries: 18
+  delay: 10
+  until: npm_api_health.status in [200,401]
+  changed_when: false
+
+- name: Obtain NPM access token
+  ansible.builtin.uri:
+    url: "{{npm_api_url}}/tokens"
+    method: POST
+    body_format: json
+    body:
+      identity: "{{npm_admin_email.stdout}}"
+      secret: "{{npm_admin_password.stdout}}"
+    status_code: 200
+    timeout: "{{npm_api_timeout}}"
+  register: npm_token_response
+  no_log: true
+  changed_when: false
+
+- name: Set NPM bearer token fact
+  ansible.builtin.set_fact:
+    npm_api_token: "{{npm_token_response.json.token}}"
+  no_log: true
