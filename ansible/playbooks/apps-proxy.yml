@@ -3,24 +3,12 @@
   hosts: homelab
   become: true
   vars:
-    stack_name: nginx-proxy-manager
-    stack_src: "{{ playbook_dir }}/../files/compose/{{ stack_name }}"
-    stack_dest: "{{ homelab_root }}/{{ stack_name }}"
+    keepass_script: "{{ playbook_dir }}/../scripts/keepass-get.sh"
+    stack:
+      name: nginx-proxy-manager
+      env_keys:
+        - { env: NPM_ADMIN_EMAIL, key: NPM_ADMIN_EMAIL }
+        - { env: NPM_ADMIN_PASSWORD, key: NPM_ADMIN_PASSWORD }
   tasks:
-    - name: Ensure stack directory exists
-      ansible.builtin.file:
-        path: "{{ stack_dest }}"
-        state: directory
-        mode: "0755"
-
-    - name: Sync compose files to server
-      ansible.builtin.copy:
-        src: "{{ stack_src }}/"
-        dest: "{{ stack_dest }}/"
-        mode: "0644"
-
     - name: Deploy Nginx Proxy Manager
-      community.docker.docker_compose_v2:
-        project_src: "{{ stack_dest }}"
-        state: present
-        pull: policy
+      ansible.builtin.include_tasks: ../tasks/deploy-stack-with-env.yml

@@ -33,7 +33,7 @@
         propagation_seconds: "{{desired_cert.propagation_seconds | default(120)}}"
         key_type: "{{desired_cert.key_type | default('ecdsa')}}"
     status_code: [201]
-    timeout: "{{npm_api_timeout}}"
+    timeout: "{{npm_cert_timeout}}"
   register: npm_cert_create
   when: npm_matched_cert is none
   changed_when: npm_cert_create.status == 201

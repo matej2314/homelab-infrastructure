@@ -16,6 +16,8 @@ services:
     environment:
       TZ: "Europe/Warsaw"
       DISABLE_IPV6: "true"
+      INITIAL_ADMIN_EMAIL: ${NPM_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD: ${NPM_ADMIN_PASSWORD}
 
     volumes:
       - ./data:/data
